@@ -1,25 +1,41 @@
 
 //section 4.1.2
+//each line in the file contains a transaction date, time, customer ID, product ID, quantity, and product price, delimited with hash signs
 val tranFile = sc.textFile("first-edition/ch04/ch04_data_transactions.txt")
 val tranData = tranFile.map(_.split("#"))
 var transByCust = tranData.map(tran => (tran(2).toInt, tran))
 
 transByCust.keys.distinct().count()
 
+// unlike `RDD transformation`, `RDD action` immediately return the result as a Java/Scala/Python object rather another RDD
 transByCust.countByKey()
+
+// map and sum are standard scala function, not Spark funciton
 transByCust.countByKey().values.sum
+
+// find the customer who made the most purcheses
 val (cid, purch) = transByCust.countByKey().toSeq.sortBy(_._2).last
 var complTrans = Array(Array("2015-03-30", "11:59 PM", "53", "4", "1", "0.00"))
 
+// all the product purchased by customer with ID 53
 transByCust.lookup(53)
+// res1: Seq[Array[String]] = WrappedArray(Array(2015-03-30, 6:18 AM, 53, 42, 5, 2197.85), Array(2015-03-30, 4:42 AM, 53, 3, 6, 9182.08), ...
 transByCust.lookup(53).foreach(tran => println(tran.mkString(", ")))
+// 2015-03-30, 6:18 AM, 53, 42, 5, 2197.85
+// 2015-03-30, 4:42 AM, 53, 3, 6, 9182.08
+// ...
 
+// give a 5% discount for two or more Barbie Shopping Mall Playsets bought
+// 25: Barbie Shopping Mall Playset ID
 transByCust = transByCust.mapValues(tran => {
      if(tran(3).toInt == 25 && tran(4).toDouble > 1)
          tran(5) = (tran(5).toDouble * 0.95).toString
      tran })
 
+// add a complimentary toothbrush (ID 70) to customers who bought five or more dictionaries (ID 81)
+// flatMap concanated the WrapArrays, thus each element is a inner array which represent a transaction
 transByCust = transByCust.flatMapValues(tran => {
+	// 3:product ID; 81: dictionary; 4; quantity; 5:product price
     if(tran(3).toInt == 81 && tran(4).toInt >= 5) {
        val cloned = tran.clone()
        cloned(5) = "0.00"; cloned(3) = "70"; cloned(4) = "1";
@@ -29,16 +45,35 @@ transByCust = transByCust.flatMapValues(tran => {
        List(tran)
     })
 
-
+// finding the customer who spent the most
+// `RDD.reduceByKey` operation merge all the values of a key into a single value of the same type, according to the `merge` function passed in
+// `RDD.foldByeKey' operation does the same thing, except that it requires an additional parameter `zeroValue`
+// `zeroValue` should be a neutral value (0 for addition, 1 for multiplication, Nil for lists, and so forth)
 val amounts = transByCust.mapValues(t => t(5).toDouble)
 val totals = amounts.foldByKey(0)((p1, p2) => p1 + p2).collect()
 totals.toSeq.sortBy(_._2).last
+
+// `zeroValue` should be a neutral value (0 for addition, 1 for multiplication, Nil for lists, and so forth), it applied on the first value of a key and might be applied multiple times due to the RDD's parallel nature.
+// demonstrate that `zerovalue` parameter will be added more than once during the computation
 amounts.foldByKey(100000)((p1, p2) => p1 + p2).collect()
 
+// give a pair of pajamas (ID 63) to the customer with ID 76 
 complTrans = complTrans :+ Array("2015-03-30", "11:59 PM", "76", "63", "1", "0.00")
+
+// add complTrans to the transByCust RDD and save to file
+// sc.parallelize(local_python_collection): convert local collection to RDD
+// t(2): column 2 is customer ID
 transByCust = transByCust.union(sc.parallelize(complTrans).map(t => (t(2).toInt, t)))
 transByCust.map(t => t._2.mkString("#")).saveAsTextFile("ch04output-transByCust")
 
+// Doc of RDD.aggregateByKey
+// def aggregateByKey[U](zeroValue: U)(seqOp: (U, V) ⇒ U, combOp: (U, U) ⇒ U)(implicit arg0: ClassTag[U]): RDD[(K, U)]
+//     Aggregate the values of each key, using given combine functions and a neutral "zero value".
+//
+// trans(3) is customer_id
+// zeroValue List[String](), an empty string
+// seqOp (U, V) => (U): (prods, tran) => prods ::: List(tran(3)) 
+// combOp (U, U) => (U): (prods1, prods2) => prods1 :: prods2
 val prods = transByCust.aggregateByKey(List[String]())(
    (prods, tran) => prods ::: List(tran(3)),
    (prods1, prods2) => prods1 ::: prods2)
@@ -47,7 +82,10 @@ prods.collect()
 //section 4.2.2
 import org.apache.spark.rdd.RDD
 val rdd:RDD[Int] = sc.parallelize(1 to 10000)
+// creates a pair RDD by using the map transformation, which removes the partitioner, and then switches its keys and values by using another map transformation
+// this line don't caused a shuffle
 rdd.map(x => (x, x*x)).map(_.swap).collect()
+// uses the same pair RDD as before, but this time the reduceByKey transformation  instigates a shuffle
 rdd.map(x => (x, x*x)).reduceByKey((v1, v2)=>v1+v2).collect()
 
 //section 4.2.4
