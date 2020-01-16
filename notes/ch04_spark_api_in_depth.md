@@ -598,7 +598,68 @@ rdd1.zip(rdd2).collect()
 
 > like `mapPartitions` but it's for `zip` not execute some `map` function
 
-<b>parameters</b>
+<b>parameters</b>: two sets of arguments:
+
+* 1st set: RDDs, and optional arguement `preservesPartitioning` to disable shuffle</br>
+* 2nd set: a functions takes matching number of Iterator objects for accessing elements in each partition (must be able to handle RDDs with different element numbers)</br>
+
+example: 
+
+~~~Scala
+val rdd1 = sc.parallelize(1 to 10, 10)                 // 10 integers in 10 partitions
+val rdd2 = sc.parallelize((1 to 8).map(x=>"n"+x), 10)  // 8  strings  in 10 partitions
+rdd1.zipPartitions(rdd2, true)((iter1, iter2) => {     // preservesPartitioning = true
+         iter1
+	.zipAll(iter2, -1, "empty")
+        .map({case(x1, x2)=>x1+"-"+x2})
+    }).collect()
+//     res1: Array[String] = Array(1-empty, 2-n1, 3-n2, 4-n3, 5-n4, 6-empty, 7-n5, 8-n6, 9-n7, 10-n8)
+~~~
+
+Scala's `zipAll` function aboveis to combine 2 iterators with dummy value -1 and "empty" for missing values in the 2 RDDs
+
+> also can change the number of elements in the partitions by using an iterator function such as `drop` or `flatMap`
+
+### 4.3.2 sorting data
+
+transformations: `sortByKey`, `sortBy`, `repartitionAndSortWithinPartition` (section 4.2.3)
+
+#### sortBy
+
+example: using `sortBy` to sort `totalsAndProds` alphabetically
+
+~~~Scala
+// sortedProds: prod_id -> (prod_count, prod_info), prod_info[1] is prod_name
+val sortedProds = totalsAndProds.sortBy(_._2._2(1)) 
+sortedProds.collect()
+// output: 
+// res0: Array[(Double, Array[String])] = Array((90,(48601.89,Array(90, AMBROSIA TRIFIDA POLLEN, 5887.49, 1))), (94,(31049.07,Array(94, ATOPALM MUSCLE AND JOINT, 1544.25, 7))), (87 (26047.72,Array(87, Acyclovir, 6252.58, 4))), ...
+
+// identical approach
+// 2 transforms: keyBy prod_name then sortByKey
+val sortedProds2 = totalsAndProds.keyBy(_._2._2(1))sortByKey()
+sortedProds2.collect()
+~~~
+
+> In `Java`, the `sortByKey` method takes an object that implements the [`Comparator` interface]( http://mng.bz/5Suh). That’s the standard way of sorting in Java. There is no `sortBy` method in the JavaRDD class.
+
+#### sortByKey
+
+Transformations `sortByKey` and `repartitionAndSortWithinPartition` care available only on `pair RDDs` with orderable keys. There are 2 ways to make a class orderable: 
+
+1. <b>`Ordered trais`</b>: similar to Java's `Comparable` interface
+
+> create the class by extending `Ordered` trait which can compare with another object
+
+2. <b>`Ordering trait`</b>: similar to java's `Comparator` interface
+
+> create a class which provide a function to compare 2 RDD objects
+
+
+
+
+
+
 
 
 
