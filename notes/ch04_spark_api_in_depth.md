@@ -647,27 +647,373 @@ sortedProds2.collect()
 
 Transformations `sortByKey` and `repartitionAndSortWithinPartition` care available only on `pair RDDs` with orderable keys. There are 2 ways to make a class orderable: 
 
-1. <b>`Ordered trais`</b>: similar to Java's `Comparable` interface
+1. <b>using `Ordered trais`</b>: similar to Java's `Comparable` interface
 
 > create the class by extending `Ordered` trait which can compare with another object
 
-2. <b>`Ordering trait`</b>: similar to java's `Comparator` interface
+~~~scala
+case class Employee(lastName: String) extends Ordered[Employee] {
+    // 0 for "=="; "<0" for "this < that"; ">0" for "this > that"
+    override def compare(that: Employee) = this.lastName.compare(that.lastName)
+}
+~~~
+
+> (1) `sortByKey` requires the parameter of type `Ordering`<br/>
+> (2) `Employee` defined above is the type of `Ordered` however<br/>
+> But it's OK because there's an implicit conversion in Scala from `Ordered` to `Ordering` to bridge them<br/>
+
+2. <b>using `Ordering trait`</b>: similar to java's `Comparator` interface
 
 > create a class which provide a function to compare 2 RDD objects
 
+~~~scala
+implicit val emplOrdering = new Ordering[Employee] {
+    // 0 for "=="; "<0" for "left < right"; ">0" for "right > left"
+    override def compare(a: Employee, b: Employee) =
+         a.lastName.compare(b.lastName)
+}
+~~~
 
+If `Employee.lastName` is of `simple type`, we can define it by the alternative way as below: 
 
+~~~scala
+// Employee.lastName must be of simple type within this approach
+implicit val emplOrdering: Ordering[Employee] = Ordering.by(_.lastName)
+~~~
 
+#### `groupByKeyAndSortValues` for secondary sort
 
+`groupByKeyAndSortValues` is new transformation 
 
+* it is used on `pair RDD` `(K,V)`
+* needs an implicit `Ordering[V]` object in the scope
+* needs a partition parameter: `Partitioner` object or  `partition_num`
+* return (K, Iterable(V)), for each Key give a Iterable(V) to with values sorted according to the implicit `Ordering` object
 
+Alternative method from [https://issues.apache.org/jira/browse/SPARK-3655](https://issues.apache.org/jira/browse/SPARK-3655) which performing a secondary sort but without grouping: 
 
+Detailed explaination is in: [https://livebook.manning.com/book/spark-in-action/chapter-4/305](https://livebook.manning.com/book/spark-in-action/chapter-4/305)
+
+#### using `top` and `takeOrdered` to fetch sorted elements
+
+`takeOrdered(n)` and `top(n)` to fetch the first or last `n` objects from an RDD 
+
+> With the order sorted by an implicit `Ordering[T]` object defined in the scope</br>
+> For `pariRDD`, it does not sort by `key`, but by the order vor (K,V) tuples</br>
+> `takeOrdered(n)` and `top(n)` has been optimized and don't need to perform full sorting amoung partitions, and much faster than doing `sortBy` followed by `take`, but must make sure `n` is not too big for driver's memory
+
+### 4.3.3 Grouping Data 
+
+Transformations: `aggregateByKey` (section 4.1.2), `groupByKey`, `groupBy`, `combineByKey`
+
+#### `groupByKey` and `groupBy`
+
+<b>definations</b>
+
+~~~scala
+def groupByKey(): RDD[(K, Iterable[V])]
+def groupBy[K](f: (T) => K)(implicit kt: ClassTag[K]): RDD[(K, Iterable[T])]
+~~~
+
+> they also has versions to add `Partitioner` or `partition_num` as parameter </br>
+> `groupBy` provide a shortcut on `non-pair RDDs` by tranform them to a `pair RDDs`</br>
+
+<b>examples</b>
+
+~~~scala
+rdd.map(x => (f(x), x)).groupByKey()
+rdd.groupBy(f)
+~~~
+
+<b>these 2 transforms are memory expensive</b>, get all values of each key in memory
+
+> recomend to use `aggregateByKey`, `reduceByKey`, `foldByKey` for simpler scenarios that don't need full-grouping
+
+#### `combineByKey` 
+
+`combineByKey` is a generic transformation allows specify 1 customer function for merging `values` into `combined values` and anther 1 customer function for merging `combined values` themselves
+
+function signature: 
+
+~~~scala
+def combineByKey[C](
+	createCombiner: V      	=> C,	// create the combined value (C) from the 1st key's value (V)
+	mergeValue: (C, V)		=> C,	// merge another key's value (V) in the same partition into the combined value (C)
+	mergeCombiners: (C, C)	=> C,	// merge combined values (C) among partitions
+	partitioner: Partitioner,		// if is same as existing partitoner, no shuffle is needed
+	mapSideCombine: Boolean = true,
+	serializer: Serializer = null): RDD[(K, C)] // default is configed in spart.serializer
+~~~
+
+source code: [http://mng.bz/Z6fp](http://mng.bz/Z6fp) 
+
+> about how `aggregateByKey`, `groupByKey`, `foldByKey`, `reduceByKey` is implemented with `combinedByKey`
+
+exmaples: 
+
+~~~scala
+// create the combined value (output) from the 1st key's value (t)
+// 		t(transaction): date, time, customer_id, prod_id, quantity, price
+// 		t(t):   price
+// 		t(4):   quantity
+// input:  transaction
+// output: (min_avg_price, max_avg_price, quantity, total)
+def createComb = (
+	t:Array[String]) => {
+		val total = t(5).toDouble 
+		val q = t(4).toInt
+		(total/q, total/q, q, total)}
+
+// merge another key's value (V) in the same partition into the combined value (output)
+def mergeVal:(
+	(Double,Double,Int,Double), Array[String]) => (Double,Double,Int,Double) = {
+		case((mn,mx,c,tot), t) => {
+			val total = t(5).toDouble
+			val q = t(4).toInt
+			(scala.math.min(mn,total/q), scala.math.max(mx,total/q), c+q, tot+total)
+		}
+	}
+
+// merge combined values among partitions
+def mergeComb:(
+	(Double,Double,Int,Double), (Double,Double,Int,Double)) => (Double,Double,Int,Double) = {
+		case((mn1,mx1,c1,tot1),(mn2,mx2,c2,tot2)) 
+			=> (scala.math.min(mn1,mn1), scala.math.max(mx1,mx2), c1+c2, tot1+tot2)
+	} 
+
+// transByCust: customer_id -> Array(transaction<date,time,customer_id,prod_id, quantity, price>)
+// invoking co
+val avgByCust = transByCust.combineByKey(
+		createComb, // for creating the combined value from the 1st key's value
+		mergeVal,   // for merging another key's valuein the same partition into the combined value
+		mergeComb,  // for merging combined values among partitions
+		// the partitioning is preserved by using the previous number of partitions #4
+	  	new org.apache.spark.HashPartitioner(transByCust.partitions.size)
+	).mapValues(
+		# function parsed to RDD.mapValues
+	 	{case(mn,mx,cnt,tot) => (mn,mx,cnt,tot,tot/cnt)}
+	) 
+	
+// test
+avgByCust.first()
+//		res0: (Int, (Double, Double, Int, Double, Double)) = (96,(856.2885714285715,4975.08,57,36928.57,647.869649122807))
+
+// save to file
+totalsAndProds
+	.map(_._2)
+	.map(x=>x._2.mkString("#")+", "+x._1)
+	.saveAsTextFile("ch04output-totalsPerProd")
+
+avgByCust
+	.map{case (id, (min, max, cnt, tot, avg)) 
+		=> "%d#%.2f#%.2f#%d#%.2f#%.2f".format(id, min, max, cnt, tot, avg)}
+	.saveAsTextFile("ch04output-avgByCust")
+~~~
 
 ## 4.4 Understanding RDD dependencies
 
+>  Spark’s inner mechanisms: RDD dependencies and RDD checkpointing which complete the picture of the Spark Core API
 
-## 4.5 Using accumulators and broadcast variables to communicate with Spark executors
+### 4.4.1. RDD dependencies and Spark execution
 
+#### execution model
+
+* Spark’s execution model is based on directed acyclic graphs (DAGs: 有向无环图) <br/>
+* RDDs are vertices and dependencies are edges <br/>
+* Performing a transformation, will create a new vertex (a new RDD) and a new edge (a dependency)<br/>
+
+#### dependencies
+
+2 types of dependencies: `narrow dependencies` and `wide denpendencies (shuffle)` <br/>
+
+> whether shuffle is needed is denpend on the rule in $4.2.2, also a shuffle is always performed when joining RDDs
+
+`narrow dependencies` includes: 
+
+* `one-to-one dependencies`: 
+* `range dependencies`: used for `union` transformation which combining several parent RDDs
+
+example is in [https://livebook.manning.com/book/spark-in-action/chapter-4/350](https://livebook.manning.com/book/spark-in-action/chapter-4/350)
+
+~~~scala
+val list = List.fill(500)(scala.util.Random.nextInt(10))
+val listrdd = sc.parallelize(list, 5)
+val pairs = listrdd.map(x => (x, x*x))
+val reduced = pairs.reduceByKey((v1, v2)=>v1+v2)
+val finalrdd = reduced.mapPartitions(
+             iter => iter.map({case(k,v)=>"K="+k+",V="+v}))
+finalrdd.collect()
+~~~
+
+print the RDD's DAG which is useful when tuning the performance or debugging
+
+~~~shell
+scala> println(finalrdd.toDebugString)
+(6) MapPartitionsRDD[4] at mapPartitions at <console>:20 []
+ |  ShuffledRDD[3] at reduceByKey at <console>:18 []
+ +-(5) MapPartitionsRDD[2] at map at <console>:16 []
+    |  ParallelCollectionRDD[1] at parallelize at <console>:14 []
+~~~
+
+### 4.2.2 Spark stages and tasks
+
+this section is about how Spark packages work to be sent to executors
+
+`Every job` is divided into stages based on the `points where shuffles occu` 
+
+> For each stage and each partition, tasks are created and sent to the executors. If the stage ends with a shuffle, the tasks created will be shuffle-map tasks. After all tasks of a particular stage complete, the driver creates tasks for the next stage and sends them to the executors, and so on. This repeats until the last stage (in this case, Stage 2), which will need to return the results to the driver. The tasks created for the last stage are called result task
+
+### 4.3.3 Saving the RDD lineage with checkpointing
+
+`RDD lineage`: graph of dependencies of RDDs
+
+Spark provides a way to persist (RDD data, caching, lineage on checkpointing) the entire RDD to stable storage for recovery on node failure. 
+
+<b>`checkpoint` operation</b>: will trigger the checkpoint to the `HDFS path` or `local path` assigned by `SparkContext.setCheckpointDir()` 
+
+> `checkpoint` is also importent in Spark Streaming
+
+
+## 4.5 Accumulators and broadcast variables 
+
+> `accumulators` and `broadcast` are used to communicate with Spark executors for maintaining global state or share data across tasks and partitions 
+
+### 4.5.1 obtaining data from executors with accumulators
+
+`accumulators`: (1) shared across executors (2) can only add to (such as global sums and counters)
+
+#### Accumulator
+
+<b>`SparkContext.accumulator(initialValue)`</b> or <b>`sc.accumulator(initialValue, "accumulatorName")`</b> can be used for creating accumulators, it will be displayed in `Spark web UI (stage details page), CH11` for tracking
+
+example: 
+
+~~~scala
+val acc  = sc.accumulator(0, "acc name")
+val list = sc.parallelize(1 to 1000000)
+list.foreach(x => acc.add(1))
+
+acc.value
+// res0: Int = 1000000
+
+list.foreach(x => acc.value)
+// java.lang.UnsupportedOperationException: Can't read accumulator value in task
+~~~
+
+#### AccumulatorParam
+
+`AccumulatorParam` defined in the scope of `Accumulator` or `Accumulable` is used for adding values to them 
+
+> Spark provides implicit `AccumulatorParam` for `numeric types`, but for other types, need to provide a custom `AccumulatorParam` object
+
+<b>methods of AccumulatorParam</b>
+
+* `zero(initialValue: T)`: initial value passed to executors 
+* `addInPlace(v1: T, v2: T):T`: merge 2 accumulated values
+* `addAccumulator(v1: T, v2: V): T`: add value of an Accumulator to the accumulated value
+
+
+#### Accumulable
+
+`Accumulable` is for custom accumulators cooporated with `AccumulableParam`
+
+example: 
+
+~~~
+val rdd = sc.parallelize(1 to 100)
+import org.apache.spark.AccumulableParam
+
+// in (Int, Int): 1st Int is for tracking count, 2nd is for sum
+implicit object AvgAccParam extends AccumulableParam[(Int, Int), Int]
+{
+	def zero(v:(Int, Int)) = (0, 0)
+	def addInPlace(v1:(Int, Int), v2:(Int, Int))
+  		= (v1._1+v2._1, v1._2+v2._2)
+	def addAccumulator(v1:(Int, Int), v2:Int)
+  		= (v1._1+1, 	v1._2+v2)
+}
+val acc = sc.accumulable((0,0))
+rdd.foreach(x => acc += x)
+val mean = acc.value._2.toDouble / acc.value._1
+// mean: Double = 50.5
+~~~
+
+#### accumulating values in accumulable collections
+
+`SparkContext.accumulableCollection()` create a shared mutable collections for storing the accumulated values
+
+> do no need implicit objects as in previouse section </br>
+> easier to implement 
+
+~~~scala
+import scala.collection.mutable.MutableList
+val colacc = sc.accumulableCollection(MutableList[Int]())
+
+rdd.foreach(x => colacc += x)
+colacc.value
+//	res0: 
+//		scala.collection.mutable.MutableList[Int]
+//	 	= MutableList(1, 2, 3, 4, 5, 6, 7, 8, 9, 
+//						 10, 31, 32, 33, ...)
+~~~
+
+<b>notice:</b> the results aren’t sorted
+
+> because there’s no guarantee that the accumulator results from various partitions will return to the driver in any specific order
+
+### 4.5.2 broadcast variables
+
+`broadcast variables` is used for sending data to executors, the driver create it, and executors read it.
+
+> for example: you have a large set of data that the majority of your executors need, `broadcast variables` don't cause duplicated data transfer
+
+#### sending data to executors
+
+`SparkContext.broadcast(value)` will create a `Broadcast` object
+
+> the `value` <br/>
+> can be any serializable object</br>
+> it can be read by executors using the `Broadcast.value` method
+
+<b>notice:</b> always access the content through `value` mehtod, and never directly for preventing duplicated serialize and vairable shipping 
+
+#### destroying and unpersisting broadcast variables
+
+`destroy` method removes the broadcast variable from both executors and driver
+
+`unpersist` method only removes the broadcast variable from cache in the executor. The variable can be sent to executors again
+
+broadcast variables are `automatically unpersisted` by Spark after they go out of scope
+
+> so it’s unnecessary to explicitly unpersist them, instead, you can remove the reference to the broadcast variable in the driver program
+
+#### configuration parameters 
+
+* `spark.broadcast.compress`: whether compress before transfer (leave this at true)
+* `spark.io.compression.codec`: codec for compress
+* `spark.broadcast.blockSize`: size of the chunks of data used for transferring broadcast data. (probably leave this at the battle-tested default of 4096).
+* `spark.python.worker.reuse`: greatly affect broadcast performance in Python because, if workers aren’t reused, broadcast variables will need to be transferred for each task (You should keep this at true, which is the default value) .
 
 ## 4.6 Summary
 
+* `Pair RDDs` contain two-element tuples: `keys` and `values`.
+* Pair RDDs in Scala are implicitly converted to instances of class PairRDDFunctions, which hosts special pair RDD operations.
+* countByKey returns a map containing the number of occurrences of each key.
+* mapValues changes the values contained in a pair RDD without changing the associated keys.
+* flatMapValues enables you to change the number of elements corresponding to a key by mapping each value to zero or more values.
+* reduceByKey and foldByKey let you merge all the values of a key into a single value of the same type.
+* aggregateByKey merges values, but it also transforms values to another type.
+* Data partitioning is Spark’s mechanism for dividing data between multiple nodes in a cluster.
+* The number of RDD partitions is important because, in addition to influencing data distribution throughout the cluster, it also directly determines the number of tasks that will be running RDD transformations.
+* Partitioning of RDDs is performed by Partitioner objects that assign a partition index to each RDD element. Spark provides two implementations: HashPartitioner and RangePartitioner.
+* Physical movement of data between partitions is called shuffling. It occurs when data from multiple partitions needs to be combined in order to build partitions for a new RDD.
+* During shuffling, in addition to being written to disk, the data is also sent over the network, so it’s important to try to minimize the number of shuffles during Spark jobs.
+* RDD operations for working on partitions are mapPartitions and mapPartitionsWithIndex.
+* The four classic joins in Spark function just like the RDBMS joins of the same names: join (inner join), leftOuterJoin, rightOuterJoin, and fullOuterJoin.
+* cogroup performs grouping of values from several RDDs by key and returns an RDD whose values are arrays of Iterable objects containing values from each RDD.
+* The main transformations for sorting RDD data are sortByKey, sortBy, and repartitionAndSortWithinPartition.
+* Several pair RDD transformations can be used for grouping data in Spark: aggregateByKey, groupByKey (and the related groupBy), and combineByKey.
+* RDD lineage is expressed as a directed acyclic graph (DAG) connecting an RDD with its parent RDDs, from which it was transformed.
+* Every Spark job is divided into stages based on the points where shuffles occur.
+* The RDD lineage can be saved with checkpointing.
+* Accumulators and broadcast variables enable you to maintain a global state or share data across tasks and partitions in your Spark programs.
