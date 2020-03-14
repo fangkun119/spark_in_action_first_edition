@@ -305,7 +305,7 @@ $ echo "15,16,20,20
 code in spark shell
 
 ~~~shell 
-scala> val lines = sc.textFile("/home/spark/client-ids.log") //4 string for 4 lines
+scala> val lines = sc.textFile("/home/vagrant/client-ids.log") //4 string for 4 lines
 lines: org.apache.spark.rdd.RDD[String] = client-ids.log
  MapPartitionsRDD[1] at textFile at <console>:21
 
