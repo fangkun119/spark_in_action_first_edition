@@ -78,14 +78,14 @@ Destroy the VM (if needed)
 
 > it will stop the machine but preserve your work. If you wish to completely remove the VM and free up its space
 
-~~~
+~~~shell
 vagrant destroy
 ~~~
 
 The downloaded Vagrant box also can be removed 
 
-~~~
-$ vagrant box remove manning/spark-in-action
+~~~shell
+vagrant box remove manning/spark-in-action
 ~~~
 
 
