@@ -2,14 +2,14 @@
 
 Table of Contents: </br>
 
-> 7.1. Introduction to machine learning
-> 7.2. Linear algebra in Spark
-> 7.3. Linear regression
-> 7.4. Analyzing and preparing the data
-> 7.5. Fitting and using a linear regression model
-> 7.6. Tweaking the algorithm
-> 7.7. Optimizing linear regression
-> 7.8. Summary
+> 7.1. Introduction to machine learning </br>
+> 7.2. Linear algebra in Spark </br>
+> 7.3. Linear regression </br>
+> 7.4. Analyzing and preparing the data </br>
+> 7.5. Fitting and using a linear regression model </br>
+> 7.6. Tweaking the algorithm </br>
+> 7.7. Optimizing linear regression </br>
+> 7.8. Summary </br>
 
 Documents: </br>
 
