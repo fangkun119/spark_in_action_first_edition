@@ -9,8 +9,8 @@
 change to the folder where you put vagrant file
 
 ~~~shell
-$ vagrant up
-$ vagrant ssh # or other ssh client
+$ vagrant up  # select the network interface with internet access, otherwise some component can not start up
+$ vagrant ssh # or other ssh client, password is vagrant (if not setted in Vagrantfile) 
 $ git clone https://github.com/spark-in-action/first-edition
 ~~~
 
@@ -20,9 +20,9 @@ $ git clone https://github.com/spark-in-action/first-edition
 $ which java
 /usr/bin/java
 $ ls -la /usr/bin/java
-lrwxrwxrwx 1 root root 22 Apr 19 18:36 /usr/bin/java -> /etc/alternatives/java
-$ ls -la /etc/alternatives/java
-lrwxrwxrwx 1 root root 46 Apr 19 18:36 /etc/alternatives/java -> /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+lrwxrwxrwx 1 root root 22 Apr 19  2016 /usr/bin/java -> /etc/alternatives/java
+$ ls -ls /etc/alternatives/java
+0 lrwxrwxrwx 1 root root 46 Apr 19  2016 /etc/alternatives/java -> /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 $ echo $JAVA_HOME
 /usr/lib/jvm/java-8-openjdk-amd64/jre
 ~~~
@@ -33,11 +33,14 @@ $ echo $JAVA_HOME
 
 ~~~shell
 $ hadoop fs -ls /user
+$ /usr/local/hadoop/bin/hadoop fs -ls /user
 Found 1 items
 drwxr-xr-x   - spark supergroup          0 2016-04-19 18:49 /user/spark
 ~~~
 
 <b>hdfs-deamon</b>
+
+if you want to restart the hdfs deamon, use below scripts
 
 ~~~shell
 $ /usr/local/hadoop/sbin/start-dfs.sh
@@ -54,14 +57,12 @@ for manually building spark, need to follow appendix B </br>
 
 ~~~shell
 $ ls /opt | grep spark
-spark-1.3.0-bin-hadoop2.4
-spark-1.3.1-bin-hadoop2.4
-spark-1.4.0-bin-hadoop2.4
-spark-1.5.0-bin-hadoop2.4
 spark-1.6.1-bin-hadoop2.6
 spark-2.0.0-bin-hadoop2.7
-$ sudo rm -f /usr/local/spark
-$ sudo ln -s /opt/spark-1.6.1-bin-hadoop2.4 /usr/local/spark
+$ ls -la /usr/local/spark
+lrwxrwxrwx 1 root root 31 Sep 17  2016 /usr/local/spark -> /opt/spark-2.0.0-bin-hadoop2.7/
+$ ls -la /usr/local/spark/bin/spark-shell
+-rwxr-xr-x 1 spark 500 3026 Jul 19  2016 /usr/local/spark/bin/spark-shell
 ~~~
 
 <b>SPARK_HOME</b>
@@ -83,6 +84,7 @@ declare -x SPARK_HOME="/usr/local/spark"
 
 ~~~python
 $ spark-shell
+$ /usr/local/spark/bin/spark-shell
 Spark context Web UI available at http://10.0.2.15:4040
 …
 Type :help for more information.
@@ -303,7 +305,7 @@ $ echo "15,16,20,20
 code in spark shell
 
 ~~~shell 
-scala> val lines = sc.textFile("/home/spark/client-ids.log") //4 string for 4 lines
+scala> val lines = sc.textFile("/home/vagrant/client-ids.log") //4 string for 4 lines
 lines: org.apache.spark.rdd.RDD[String] = client-ids.log
  MapPartitionsRDD[1] at textFile at <console>:21
 
