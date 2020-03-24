@@ -328,9 +328,9 @@ import org.apache.spark.mllib.linalg.Vectors
 # 数据：每行一个样本，没列一个浮点数代表一个特征值，用逗号分隔
 #  载入：分6个分区存储，housingVals每个原始是一个vector<double>，代表一个样本
 val housingLines
-	= sc.textFile("first-edition/ch07/housing.data", 6) 
+    = sc.textFile("first-edition/ch07/housing.data", 6) 
 val housingVals = housingLines.map(
-	x => Vectors.dense(x.split(",").map(_.trim().toDouble)))
+    x => Vectors.dense(x.split(",").map(_.trim().toDouble)))
 
 # 2. column summary statistics with `RowMatrix` 
 # 分析数据分布：使用前面介绍的RowMatrix
@@ -396,7 +396,7 @@ val housingValid = sets(1)
 # 3. feature scaling and mean normalization
 import org.apache.spark.mllib.feature.StandardScaler
 val scaler = new StandardScaler(true, true)
-					.fit(housingTrain.map(x => x.features))
+                    .fit(housingTrain.map(x => x.features))
 val trainScaled = housingTrain.map(x => LabeledPoint(x.label,
  scaler.transform(x.features)))
 val validScaled = housingValid.map(x => LabeledPoint(x.label,
@@ -421,7 +421,7 @@ The 2nd way can find the intercept as below
 
 ~~~scala
 val alg = new LinearRegressionWithSGD() 
-alg.setIntercept(true)	
+alg.setIntercept(true)    
 // ...
 alg.run(trainScaled)
 ~~~
@@ -439,11 +439,11 @@ import org.apache.spark.mllib.regression.LinearRegressionWithSGD
 
 // 1. training with train-set
 val alg = new LinearRegressionWithSGD() // init the objects
-alg.setIntercept(true)						// set opt to find intercept
-alg.optimizer.setNumIterations(200)		// iteration number
-trainScaled.cache()							// caching input is importent
+alg.setIntercept(true)                  // set opt to find intercept
+alg.optimizer.setNumIterations(200)     // iteration number
+trainScaled.cache()                     // caching is importent
 validScaled.cache()
-val model = alg.run(trainScaled)			// start to train model
+val model = alg.run(trainScaled)        // start to train model
 
 // 2. predect with validate-set
 val validPredicts = validScaled.map(x => (model.predict(x.features), x.label))
@@ -460,18 +460,18 @@ validMetrics.rootMeanSquaredError
 validMetrics.meanSquaredError
 // res2: Double = 22.806434803863162
 validMetrics.meanAbsoluteError # Average absolute difference
-validMetrics.r2					 # 
+validMetrics.r2                # 
 validMetrics.explainedVariance # A value similar to R2 
 
 // 4. interpreting the model parameters
 // If a particular weight is near zero, the corresponding dimension doesn’t contribute to the target variable (price of housing) in a significant way (assuming the data has been scaled—otherwise even low-range features might be important)
 println(
-	model.weights
-		.toArray 			# convert to Spark Array
-		.map(x => x.abs)	# we only want to check the signaficance of features
-		.zipWithIndex		# index is attached to each weight
-		.sortBy(_._1)		# sort by abs(weight)
-		.mkString(", ")	# convert to string
+    model.weights
+        .toArray             # convert to Spark Array
+        .map(x => x.abs)     # we only want to check the signaficance of features
+        .zipWithIndex        # index is attached to each weight
+        .sortBy(_._1)        # sort by abs(weight)
+        .mkString(", ")      # convert to string
 )
 // (0.112892822124492423,6), (0.163296952677502576,2), (0.588838584855835963,3), (0.939646889835077461,0), (0.994950411719257694,11), (1.263479388579985779,1),(1.660835069779720992,9), (2.030167784111269705,4), (2.072353314616951604,10), (2.419153951711214781,8), (2.794657721841373189,5), (3.113566843160460237,7),(3.323924359136577734,12)
 
@@ -500,31 +500,31 @@ import org.apache.spark.rdd.RDD
 
 // 功能类似于GridSearch的函数，用来寻找最佳 iteration_number 及 step_size 超参数
 def iterateLRwSGD(
-			iterNums:Array[Int], 		// parameters of iteration_number
-			stepSizes:Array[Double], 	// parameters of step_size
-			train:RDD[LabeledPoint], 	// train-set
-			test:RDD[LabeledPoint]		// test-set
-		) = {
-	for(numIter <- iterNums; step <- stepSizes) {
-		// 初始化模型
-		val alg = new LinearRegressionWithSGD()
-		// 设置模型参数：
-    	alg.setIntercept(true)			// need to find intercept
-    		.optimizer					
-    		.setNumIterations(numIter)	// number of iterations
-    		.setStepSize(step)			// step size
-		// 训练模型
-		val model = alg.run(train)
-		// 用训练好的模型在训练集、验证集上做预测
-		val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
-		val validPredicts = test.map(x => (model.predict(x.features), x.label))
-		// 训练集、验证集均方误差
-		val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		println("%d, %5.3f -> %.4f, %.4f".format(numIter, step, meanSquared, meanSquaredValid))
-    	// 查看当前超参数组合下模型的特征权重及截距
-    	// Uncomment if you wish to see weghts and intercept values:
-    	// println("%d, %4.2f -> %.4f, %.4f (%s, %f)".format(numIter, step, meanSquared,meanSquaredValid, model.weights, model.intercept))
+            iterNums:Array[Int],     // 迭代次数超参数
+            stepSizes:Array[Double], // 梯度下降步长超参数
+            train:RDD[LabeledPoint], // 训练集
+            test:RDD[LabeledPoint]   // 验证集
+    ) = {
+    for(numIter <- iterNums; step <- stepSizes) {
+        // 初始化模型
+        val alg = new LinearRegressionWithSGD()
+        // 设置模型参数：
+        alg.setIntercept(true)            // need to find intercept
+            .optimizer                    
+            .setNumIterations(numIter)    // number of iterations
+            .setStepSize(step)            // step size
+        // 训练模型
+        val model = alg.run(train)
+        // 用训练好的模型在训练集、验证集上做预测
+        val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
+        val validPredicts = test.map(x => (model.predict(x.features), x.label))
+        // 训练集、验证集均方误差
+        val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        println("%d, %5.3f -> %.4f, %.4f".format(numIter, step, meanSquared, meanSquaredValid))
+        // 查看当前超参数组合下模型的特征权重及截距
+        // Uncomment if you wish to see weghts and intercept values:
+        // println("%d, %4.2f -> %.4f, %.4f (%s, %f)".format(numIter, step, meanSquared,meanSquaredValid, model.weights, model.intercept))
   }
 }
 
@@ -584,18 +584,18 @@ val housingHPValid = setsHP(1)
 // 3. scale the features
 val scalerHP = new StandardScaler(true, true).fit(housingHPTrain.map(x => x.features))
 val trainHPScaled = housingHPTrain.map(
-		x => LabeledPoint(x.label, scalerHP.transform(x.features)))
+        x => LabeledPoint(x.label, scalerHP.transform(x.features)))
 val validHPScaled = housingHPValid.map(
-		x => LabeledPoint(x.label, scalerHP.transform(x.features)))
+        x => LabeledPoint(x.label, scalerHP.transform(x.features)))
 trainHPScaled.cache()
 validHPScaled.cache()
 
 // 4. grad search the hyper-parameters
 iterateLRwSGD(
-	Array(200, 400),  							  // iteration numbers
-	Array(0.4, 0.5, 0.6, 0.7, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5),  // step sizes
-	trainHPScaled, 
-	validHPScaled)
+    Array(200, 400),  // iteration numbers
+    Array(0.4, 0.5, 0.6, 0.7, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5),  // step sizes
+    trainHPScaled, 
+    validHPScaled)
 // Our results:
 // 200, 0.400 -> 4.5423, 4.2002
 // 200, 0.500 -> 4.4632, 4.1532
@@ -613,7 +613,7 @@ iterateLRwSGD(
 // 400, 0.700 -> 4.1947, 4.0228
 // 400, 0.900 -> 4.1032, 3.9947
 // 400, 1.000 -> 4.0678, 3.9876
-// 400, 1.100 -> 4.0378, 3.9836  	// lower testing-error than before
+// 400, 1.100 -> 4.0378, 3.9836      // lower testing-error than before
 // 400, 1.200 -> 4.0407, 3.9863
 // 400, 1.300 -> 106.0047, 121.4576
 // 400, 1.500 -> 162153976.4283, 163000519.6179
@@ -621,10 +621,10 @@ iterateLRwSGD(
 // 5. over-fitting when iteration number is too large
 // 如果增加iteration number，testing-error反而会增高，发生了过拟合
 iterateLRwSGD(
-	Array(200, 400, 800, 1000, 3000, 6000),  	// iteration numbers
-	Array(1.1), 								// step sizes
-	trainHPScaled, 
-	validHPScaled)
+    Array(200, 400, 800, 1000, 3000, 6000), // iteration numbers
+    Array(1.1),                             // step sizes
+    trainHPScaled, 
+    validHPScaled)
 //Our results:
 // 200, 1.100 -> 4.1605, 4.0108
 // 400, 1.100 -> 4.0378, 3.9836
@@ -638,15 +638,15 @@ iterateLRwSGD(
 
 * <b>overfitting</b> (`high-variance`) occurs when the `ratio` of `model complexity` and `training-set size` (`model_complexity` / `training_set_size`) gets large </br>
 
-	> 过拟合发生在（模型复杂度/样本数量）这个比值过大时
+    > 过拟合发生在（模型复杂度/样本数量）这个比值过大时
 
 * If you have a complex model but also a relatively large training set, overfitting is less likely to occur. You saw that the RMSE on the validation set started to rise when you added higher-order polynomials and trained the model with more iterations. 
 
-	> 当样本数量充足时，使用复杂的模型（如增加高阶特征、增加迭代次数），会发现测试集误差仍然可能可以继续降低
+    > 当样本数量充足时，使用复杂的模型（如增加高阶特征、增加迭代次数），会发现测试集误差仍然可能可以继续降低
 
 * Higher-order polynomials bring more complexity to the model, and more iterations overfit the model to the data while the algorithm is converging. If we try even more iterations after some point, the training RMSE continues to decrease while the testing RMSE continues to rise.
 
-	> 当测试集误差降低到某个点位时，继续增加模型复杂度，（尽管训练集误差仍然继续降低）测试集误差会不降反生
+    > 当测试集误差降低到某个点位时，继续增加模型复杂度，（尽管训练集误差仍然继续降低）测试集误差会不降反生
 
 ~~~scala
 scala> iterateLRwSGD(Array(10000, 15000, 30000, 50000), Array(1.1),
@@ -676,38 +676,38 @@ scala> iterateLRwSGD(Array(10000, 15000, 30000, 50000), Array(1.1),
 
 ~~~scala
 def iterateLasso(
-		iterNums:Array[Int], stepSizes:Array[Double], regParam:Double, 
-		train:RDD[LabeledPoint], test:RDD[LabeledPoint]) = {
-	import org.apache.spark.mllib.regression.LassoWithSGD
-	// 遍历超参数组合
-	for(numIter <- iterNums; step <- stepSizes) {
-		// 模型初始化
-		val alg = new LassoWithSGD() 	// 模型类型为LassoWithSGD
-		alg.setIntercept(true)			 	// 需要训练得到截距
-			.optimizer
-			.setNumIterations(numIter)	// 迭代次数
-			.setStepSize(step)			// 步长
-			.setRegParam(regParam)		// 正则化参数
-		// 模型训练
-		val model = alg.run(train)	
-		// 训练集、测试集预测结果及label
-		val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
-		val validPredicts 	= test.map(x => (model.predict(x.features), x.label))
-		// 训练集、测试集均方误差
-		val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		// 打印均方误差
-		println("%d, %5.3f -> %.4f, %.4f".format(numIter, step, meanSquared, meanSquaredValid))
-		println("\tweights: "+model.weights)
-  	}
+        iterNums:Array[Int], stepSizes:Array[Double], regParam:Double, 
+        train:RDD[LabeledPoint], test:RDD[LabeledPoint]) = {
+    import org.apache.spark.mllib.regression.LassoWithSGD
+    // 遍历超参数组合
+    for(numIter <- iterNums; step <- stepSizes) {
+        // 模型初始化
+        val alg = new LassoWithSGD()      // 模型类型为LassoWithSGD
+        alg.setIntercept(true)            // 需要训练得到截距
+            .optimizer
+            .setNumIterations(numIter)    // 迭代次数
+            .setStepSize(step)            // 步长
+            .setRegParam(regParam)        // 正则化参数
+        // 模型训练
+        val model = alg.run(train)    
+        // 训练集、测试集预测结果及label
+        val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
+        val validPredicts     = test.map(x => (model.predict(x.features), x.label))
+        // 训练集、测试集均方误差
+        val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        // 打印均方误差
+        println("%d, %5.3f -> %.4f, %.4f".format(numIter, step, meanSquared, meanSquaredValid))
+        println("\tweights: "+model.weights)
+      }
 }
 iterateLasso(
-	Array(200, 400, 1000, 3000, 6000, 10000, 15000),  // 
-	Array(1.1), 		// 
-	0.01, 			// 
-	trainHPScaled, 	// 添加多项式特征的训练集
-	validHPScaled  	// 添加多项式特征的验证集
-	)
+    Array(200, 400, 1000, 3000, 6000, 10000, 15000),  // 迭代次数
+    Array(1.1),        // 梯度下降步长
+    0.01,              // L2正则项超参数
+    trainHPScaled,     // 添加多项式特征的训练集
+    validHPScaled      // 添加多项式特征的验证集
+    )
 //Our results:
 // 200, 1.100 -> 4.1762, 4.0223
 // 400, 1.100 -> 4.0632, 3.9964
@@ -722,28 +722,28 @@ iterateLasso(
 
 ~~~scala
 def iterateRidge(
-		iterNums:Array[Int],  stepSizes:Array[Double], regParam:Double, 
-		train:RDD[LabeledPoint], test:RDD[LabeledPoint]) = {
-	import org.apache.spark.mllib.regression.RidgeRegressionWithSGD
-	// 遍历超参数组合
-	for(numIter <- iterNums; step <- stepSizes) {
-		// 模型初始化
-		val alg = new RidgeRegressionWithSGD()	// 模型类型为RidgeRegressionWithSGD
-		alg.setIntercept(true)						// 需要训练得到截距
-		alg.optimizer
-			.setNumIterations(numIter)			// 迭代次数
-			.setRegParam(regParam)				// 正则化超参数
-			.setStepSize(step)					// 步长
-		// 训练模型		
-		val model = alg.run(train)
-		// 训练集、测试集预测结果及标签
-		val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
-		val validPredicts = test.map(x => (model.predict(x.features), x.label))
-		// 训练集、测试集的均方误差
-		val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		println("%d, %5.3f -> %.4f, %.4f".format(numIter, step, meanSquared, meanSquaredValid))
-	}
+        iterNums:Array[Int],  stepSizes:Array[Double], regParam:Double, 
+        train:RDD[LabeledPoint], test:RDD[LabeledPoint]) = {
+    import org.apache.spark.mllib.regression.RidgeRegressionWithSGD
+    // 遍历超参数组合
+    for(numIter <- iterNums; step <- stepSizes) {
+        // 模型初始化
+        val alg = new RidgeRegressionWithSGD()    // 模型类型为RidgeRegressionWithSGD
+        alg.setIntercept(true)                    // 需要训练得到截距
+        alg.optimizer
+            .setNumIterations(numIter)            // 迭代次数
+            .setRegParam(regParam)                // 正则化超参数
+            .setStepSize(step)                    // 步长
+        // 训练模型        
+        val model = alg.run(train)
+        // 训练集、测试集预测结果及标签
+        val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
+        val validPredicts = test.map(x => (model.predict(x.features), x.label))
+        // 训练集、测试集的均方误差
+        val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        println("%d, %5.3f -> %.4f, %.4f".format(numIter, step, meanSquared, meanSquaredValid))
+    }
 }
 iterateRidge(Array(200, 400, 1000, 3000, 6000, 10000), Array(1.1), 0.01, trainHPScaled, validHPScaled)
 // Our results:
@@ -769,36 +769,36 @@ iterateRidge(Array(200, 400, 1000, 3000, 6000, 10000), Array(1.1), 0.01, trainHP
 
 ~~~scala
 def iterateLRwSGDBatch(
-	iterNums:Array[Int], stepSizes:Array[Double], fractions:Array[Double], //超参数组合 	train:RDD[LabeledPoint], test:RDD[LabeledPoint] //训练集、验证集
-	) = {
-	// 遍历各个超参数组合
-	for(numIter <- iterNums; step <- stepSizes; miniBFraction <- fractions) {
-		// 初始化模型
-		val alg = new LinearRegressionWithSGD()	//使用SGD
-		alg.setIntercept(true)				//需要训练代表截距的参数
-			.optimizer
-			.setNumIterations(numIter)	//迭代次数：通常比BGD需要更多迭代
-			.setStepSize(step)			//梯度下降步长
-		alg.optimizer.setMiniBatchFraction(miniBFraction) //Mini Batch的大小
-		// 训练模型
-		val model = alg.run(train)	
-		// 训练集、预测集样本预测
-		val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
-		val validPredicts = test.map(x => (model.predict(x.features), x.label))
-		// 训练集、预测集均方误差
-		val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		println("%d, %5.3f %5.3f -> %.4f, %.4f".format(numIter, step, miniBFraction, meanSquared, meanSquaredValid))
+    iterNums:Array[Int], stepSizes:Array[Double], fractions:Array[Double], //超参数组合     train:RDD[LabeledPoint], test:RDD[LabeledPoint] //训练集、验证集
+    ) = {
+    // 遍历各个超参数组合
+    for(numIter <- iterNums; step <- stepSizes; miniBFraction <- fractions) {
+        // 初始化模型
+        val alg = new LinearRegressionWithSGD() // 使用SGD
+        alg.setIntercept(true)                  // 需要训练代表截距的参数
+            .optimizer
+            .setNumIterations(numIter)          // 迭代次数：通常比BGD需要更多迭代
+            .setStepSize(step)                  // 梯度下降步长
+        alg.optimizer.setMiniBatchFraction(miniBFraction) // Mini Batch的大小
+        // 训练模型
+        val model = alg.run(train)    
+        // 训练集、预测集样本预测
+        val rescaledPredicts = train.map(x => (model.predict(x.features), x.label))
+        val validPredicts = test.map(x => (model.predict(x.features), x.label))
+        // 训练集、预测集均方误差
+        val meanSquared = math.sqrt(rescaledPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        val meanSquaredValid = math.sqrt(validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        println("%d, %5.3f %5.3f -> %.4f, %.4f".format(numIter, step, miniBFraction, meanSquared, meanSquaredValid))
   }
 }
 // 首先看一下step size超参数，Grid-Search之后发现0.4最好
 // First, to get a feeling for the step-size parameter in the context of the other two
 iterateLRwSGDBatch(
-	Array(400, 1000), 	// 迭代次数
-	Array(0.05, 0.09, 0.1, 0.15, 0.2, 0.3, 0.35, 0.4, 0.5, 1), //梯度下降步长
-	Array(0.01, 0.1), 		// mini-batch size
-	trainHPScaled, validHPScaled
-	)
+    Array(400, 1000),         // 迭代次数
+    Array(0.05, 0.09, 0.1, 0.15, 0.2, 0.3, 0.35, 0.4, 0.5, 1), //梯度下降步长
+    Array(0.01, 0.1),         // mini-batch size
+    trainHPScaled, validHPScaled
+    )
 //Our results:
 // 400, 0.050 0.010 -> 6.0134, 5.2776
 // 400, 0.050 0.100 -> 5.8968, 4.9389
@@ -827,10 +827,10 @@ iterateLRwSGDBatch(
 // 发现迭代次数2000时，验证集误差最小，比上一节的BGD模型都小
 // 迭代次数达到5000时发生过拟合
 iterateLRwSGDBatch(
-	Array(400, 1000, 2000, 3000, 5000, 10000),  
-	Array(0.4), 
-	Array(0.1, 0.2, 0.4, 0.5, 0.6, 0.8), 
-	trainHPScaled, validHPScaled)
+    Array(400, 1000, 2000, 3000, 5000, 10000),  
+    Array(0.4), 
+    Array(0.1, 0.2, 0.4, 0.5, 0.6, 0.8), 
+    trainHPScaled, validHPScaled)
 // Our results:
 // 400, 0.400 0.100 -> 4.5017, 4.0547
 // 400, 0.400 0.200 -> 4.4509, 4.0288
@@ -873,51 +873,51 @@ import org.apache.log4j.Level
 Logger.getLogger("breeze").setLevel(Level.WARN)
 
 def iterateLBFGS(
-	regParams:Array[Double],  // L2正则化超参数
-	numCorrections:Int, 		  // 保留最近多少轮的
-	tolerance:Double, 		  // 早期停止阈值（收敛值容忍度）
-	train:RDD[LabeledPoint], 	  // 训练集
-	test:RDD[LabeledPoint]	  // 验证集
+    regParams:Array[Double],  // L2正则化超参数
+    numCorrections:Int,       // 保留最近多少轮的
+    tolerance:Double,         // 早期停止阈值（收敛值容忍度）
+    train:RDD[LabeledPoint],  // 训练集
+    test:RDD[LabeledPoint]    // 验证集
 ) = {
-	import org.apache.spark.mllib.optimization.LeastSquaresGradient
-	import org.apache.spark.mllib.optimization.SquaredL2Updater
-	import org.apache.spark.mllib.optimization.LBFGS
-	import org.apache.spark.mllib.util.MLUtils
-	
-	val dimnum = train.first().features.size	//特征
-	for(regParam <- regParams) {
-		val (weights:Vector, loss:Array[Double]) = LBFGS.runLBFGS(
-			train.map(x => (x.label, MLUtils.appendBias(x.features))),  // 训练集
-                  new LeastSquaresGradient(),	// 损失函数？
-                  new SquaredL2Updater(),		// 使用L2正则项?
-                  numCorrections,				// 最多保留多少轮
-                  tolerance,					// 模型收敛度阈值
-                  50000,						// 最多训练多少轮（不收敛时强制模型停止）
-                  regParam,					// L2正则化超参数
+    import org.apache.spark.mllib.optimization.LeastSquaresGradient
+    import org.apache.spark.mllib.optimization.SquaredL2Updater
+    import org.apache.spark.mllib.optimization.LBFGS
+    import org.apache.spark.mllib.util.MLUtils
+    
+    val dimnum = train.first().features.size    // 特征
+    for(regParam <- regParams) {
+        val (weights:Vector, loss:Array[Double]) = LBFGS.runLBFGS(
+            train.map(x => (x.label, MLUtils.appendBias(x.features))),  // 训练集
+                  new LeastSquaresGradient(),   // 损失函数？
+                  new SquaredL2Updater(),       // 使用L2正则项?
+                  numCorrections,               // 最多保留多少轮
+                  tolerance,                    // 模型收敛度阈值
+                  50000,                        // 最多训练多少轮（不收敛时强制模型停止）
+                  regParam,                     // L2正则化超参数
                   Vectors.zeros(dimnum+1))
-		
-		val model = new LinearRegressionModel(
-			Vectors.dense(weights.toArray.slice(0, weights.size - 1)),
-			weights(weights.size - 1))
-		// 在训练集、验证集上预测，得到训练集验证集的误差值
-		val trainPredicts = train.map(x => (model.predict(x.features), x.label))
-		val validPredicts = test.map(x => (model.predict(x.features), x.label))
-		val meanSquared = math.sqrt(
-			trainPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		val meanSquaredValid = math.sqrt(
-			validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
-		println("%5.3f, %d -> %.4f, %.4f".format(regParam, numCorrections, meanSquared, meanSquaredValid))
+        
+        val model = new LinearRegressionModel(
+            Vectors.dense(weights.toArray.slice(0, weights.size - 1)),
+            weights(weights.size - 1))
+        // 在训练集、验证集上预测，得到训练集验证集的误差值
+        val trainPredicts = train.map(x => (model.predict(x.features), x.label))
+        val validPredicts = test.map(x => (model.predict(x.features), x.label))
+        val meanSquared = math.sqrt(
+            trainPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        val meanSquaredValid = math.sqrt(
+            validPredicts.map({case(p,l) => math.pow(p-l,2)}).mean())
+        println("%5.3f, %d -> %.4f, %.4f".format(regParam, numCorrections, meanSquared, meanSquaredValid))
   }
 }
 
 // 模型收敛速度很快，主要需要
 iterateLBFGS(
-	Array(0.005, 0.007, 0.01, 0.02, 0.03, 0.05, 0.1),  //L2正则项超参数
-	10, 		// number of corrections to keep (should <= 10, 10 is default)
-	1e-5, 	// converge tolerance
-	trainHPScaled, 
-	validHPScaled
-	)
+    Array(0.005, 0.007, 0.01, 0.02, 0.03, 0.05, 0.1),  // L2正则项超参数
+    10,       // number of corrections to keep (should <= 10, 10 is default)
+    1e-5,     // converge tolerance
+    trainHPScaled, 
+    validHPScaled
+    )
 //Our results:
 // 0.005, 10 -> 3.8335, 4.0383
 // 0.007, 10 -> 3.8848, 4.0005
