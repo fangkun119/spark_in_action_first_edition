@@ -1,13 +1,21 @@
 # CH07 Getting smart with MLlib
 
-* 7.1. Introduction to machine learning
-* 7.2. Linear algebra in Spark
-* 7.3. Linear regression
-* 7.4. Analyzing and preparing the data
-* 7.5. Fitting and using a linear regression model
-* 7.6. Tweaking the algorithm
-* 7.7. Optimizing linear regression
-* 7.8. Summary
+Table of Contents: </br>
+
+> 7.1. Introduction to machine learning
+> 7.2. Linear algebra in Spark
+> 7.3. Linear regression
+> 7.4. Analyzing and preparing the data
+> 7.5. Fitting and using a linear regression model
+> 7.6. Tweaking the algorithm
+> 7.7. Optimizing linear regression
+> 7.8. Summary
+
+Documents: </br>
+
+> [http://spark.apache.org/docs/latest/ml-guide.html](http://spark.apache.org/docs/latest/ml-guide.html)</br>
+> [http://spark.apache.org/examples.html](http://spark.apache.org/examples.html)
+> [https://github.com/apache/spark/tree/master/examples/src/main/scala/org/apache/spark/examples](https://github.com/apache/spark/tree/master/examples/src/main/scala/org/apache/spark/examples)
 
 ## 7.1 Introduction to Machine Learning
 
@@ -927,27 +935,3 @@ iterateLBFGS(
 // 0.050, 10 -> 4.5319, 4.0796
 // 0.100, 10 -> 5.0571, 4.3579
 ~~~
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
