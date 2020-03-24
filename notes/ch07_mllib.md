@@ -332,22 +332,22 @@ Dataset: [Housing Data Set, UCI Machine Learning Repository](https://archive.ics
 ~~~python
 import org.apache.spark.mllib.linalg.Vectors
 
-# 1.load the dataset 
-# 数据：每行一个样本，没列一个浮点数代表一个特征值，用逗号分隔
-#  载入：分6个分区存储，housingVals每个原始是一个vector<double>，代表一个样本
+// 1.load the dataset 
+// 数据：每行一个样本，没列一个浮点数代表一个特征值，用逗号分隔
+// 载入：分6个分区存储，housingVals每个原始是一个vector<double>，代表一个样本
 val housingLines
     = sc.textFile("first-edition/ch07/housing.data", 6) 
 val housingVals = housingLines.map(
     x => Vectors.dense(x.split(",").map(_.trim().toDouble)))
 
-# 2. column summary statistics with `RowMatrix` 
-# 分析数据分布：使用前面介绍的RowMatrix
+// 2. column summary statistics with `RowMatrix` 
+// 分析数据分布：使用前面介绍的RowMatrix
 val housingMat = new RowMatrix(housingVals)
 val housingStats = housingMat.computeColumnSummaryStatistics()
 housingStats.min
 
-# 3. column summary statistics with `mllib.stat.Statistics` 
-# 分析数据分布：也可以使用Statistics类
+// 3. column summary statistics with `mllib.stat.Statistics` 
+// 分析数据分布：也可以使用Statistics类
 import org.apache.spark.mllib.stat.Statistics
 val housingStats = Statistics.colStats(housingVals)
 housingStats.min # res0: org.apache.spark.mllib.linalg.Vector = [0.00632,0.0,0.46,0.0,0.385,3.561,2.9,1.1296,1.0,187.0,12.6,0.32,1.73,5.0]
@@ -357,10 +357,10 @@ housingStats.normL1 # sum of absolute values of all elements per column
 housingStats.normL2 # also called Euclidian norm; equal to the length of a vector/column
 housingStats.variance
 
-# 4. feature similarity with cosine distances
-# 分析各个列之间的预先相似度 （该方法在Python中不可用），返回一个上三角矩阵，矩阵元素表示两个特征的离弦相似度（第i行j列元素，表示特征i与特征j的离弦相似度，取值范围[-1,+1]，-1表示完全相反、1表示两个特征相同）
+// 4. feature similarity with cosine distances
+// 分析各个列之间的预先相似度 （该方法在Python中不可用），返回一个上三角矩阵，矩阵元素表示两个特征的离弦相似度（第i行j列元素，表示特征i与特征j的离弦相似度，取值范围[-1,+1]，-1表示完全相反、1表示两个特征相同）
 val housingColSims = housingMat.columnSimilarities()
-# 查看相似度的值
+// 查看相似度的值
 def printMat(mat:BM[Double]) = {
    print("            ")
    for(j <- 0 to mat.cols-1) print("%-10d".format(j));
@@ -369,13 +369,13 @@ def printMat(mat:BM[Double]) = {
 }
 printMat(toBreezeD(housingColSims)) #toBreezeD is defined in previouse code segments
 
-# 5. compute the feature correlations with covariance matrix
-# 返回一个对称矩阵，每个元素对应两个特征（横坐标、纵坐标），值为0表示线性不相关，值大于0表示线性正相关，值小于0表示线性负相关
+// 5. compute the feature correlations with covariance matrix
+// 返回一个对称矩阵，每个元素对应两个特征（横坐标、纵坐标），值为0表示线性不相关，值大于0表示线性正相关，值小于0表示线性负相关
 val housingCovar = housingMat.computeCovariance()
 printMat(toBreezeM(housingCovar))
 
-# 6. compute the feature correlations with Spearman’s and Pearson’s methods 
-# use method provided by org.apache.spark.mllib .stat.Statistics
+// 6. compute the feature correlations with Spearman’s and Pearson’s methods 
+// use method provided by org.apache.spark.mllib .stat.Statistics
 ~~~
 
 <b>Preparing the data</b>
@@ -388,20 +388,20 @@ printMat(toBreezeM(housingCovar))
 ~~~scala
 import org.apache.spark.mllib.regression.LabeledPoint
 
-# 1. transforming to labeled points
-# housingVals每个元素的一个vector<double>代表一个样本
-# housingData每个原始是一个LabeledPoint，参数1是label，参数2是特征
+// 1. transforming to labeled points
+// housingVals每个元素的一个vector<double>代表一个样本
+// housingData每个原始是一个LabeledPoint，参数1是label，参数2是特征
 val housingData = housingVals.map(x => {
   val a = x.toArray
   LabeledPoint(a(a.length-1), Vectors.dense(a.slice(0, a.length-1)))
 })
 
-# 2. split training and validating set
+// 2. split training and validating set
 val sets = housingData.randomSplit(Array(0.8, 0.2))
 val housingTrain = sets(0)
 val housingValid = sets(1)
 
-# 3. feature scaling and mean normalization
+// 3. feature scaling and mean normalization
 import org.apache.spark.mllib.feature.StandardScaler
 val scaler = new StandardScaler(true, true)
                     .fit(housingTrain.map(x => x.features))
