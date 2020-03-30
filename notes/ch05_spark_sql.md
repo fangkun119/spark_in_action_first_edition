@@ -1129,4 +1129,3 @@ scala> val resParq = sql("select * from postsParquet")
 
 [https://livebook.manning.com/book/spark-in-action/chapter-5/417](https://livebook.manning.com/book/spark-in-action/chapter-5/417)
 
-## 5.7. Summary
