@@ -8,6 +8,13 @@
 * 5.6. Performance improvements with Tungsten
 * 5.7. Summary
 
+Documents: </br>
+[http://spark.apache.org/docs/latest/sql-programming-guide.html](http://spark.apache.org/docs/latest/sql-programming-guide.html) </br>
+[http://spark.apache.org/examples.html](http://spark.apache.org/examples.html)</br>
+[http://spark.apache.org/sql/](http://spark.apache.org/sql/)</br>
+[https://github.com/apache/spark/tree/master/examples/src/main/scala/org/apache/spark/examples](https://github.com/apache/spark/tree/master/examples/src/main/scala/org/apache/spark/examples)</br>
+
+
 ## 5.1. Working with DataFrames
 
 `DataFrame` is for structured data (distributed data in a table-like representation) with named columns and declared column types 
