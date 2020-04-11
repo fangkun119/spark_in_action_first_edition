@@ -822,15 +822,18 @@ val postsDfCorrected = postsDf.na.replace(Array("id", "acceptedAnswerId"), Map(1
 
 pyspark example:
 
-pyspark example:
-
 ~~~python
 from __future__ import print_function
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+# 1. removes rows that have `null` values in all of the columns
+cleanPosts = postsDf.na.drop()
+cleanPosts.count()
 
+# 2. replace null and NaN values with a constant
+postsDf.na.fill({"viewCount": 0}).show()
 
+# 3. replace certain values in specific columns with different ones
+postsDf.na.replace(1177, 3000, ["id", "acceptedAnswerId"]).show()
 ~~~
 
 ### 5.1.5. Converting DataFrames to RDDs
@@ -879,10 +882,37 @@ pyspark example:
 ~~~python
 from __future__ import print_function
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+# 1. use `rdd` method of `DataFrame` to convert
+# return type of `rdd` method is org.apache.spark.sql.Row
+# it will be intorduced in section 5.11, 
+# it have variouse get* method, such as `getString(index)`, `getInt(index)`, ... for access column indexes
+# it also has mkString(delimiter) method for converting to strin
+postsRdd = postsDf.rdd
 
+# 2. use `map`, `flatMap`, `mapPartitions` method to covert 
+def replaceLtGt(row):
+	return Row(
+		commentCount = row.commentCount,
+		lastActivityDate = row.lastActivityDate,
+		ownerUserId = row.ownerUserId,
+		body = row.body.replace("&lt;","<").replace("&gt;",">"),
+		score = row.score,
+		creationDate = row.creationDate,
+		viewCount = row.viewCount,
+		title = row.title,
+		tags = row.tags.replace("&lt;","<").replace("&gt;",">"),
+		answerCount = row.answerCount,
+		acceptedAnswerId = row.acceptedAnswerId,
+		postTypeId = row.postTypeId,
+		id = row.id)
+postsMapped = postsRdd.map(replaceLtGt)
 
+# 3. keep the `DataFrame` schema and convert the RDD back to `DataFrame`
+def sortSchema(schema):
+	fields = {f.name: f for f in schema.fields}
+	names = sorted(fields.keys())
+	return StructType([fields[f] for f in names])
+postsDfNew = sqlContext.createDataFrame(postsMapped, sortSchema(postsDf.schema))
 ~~~
 
 ### 5.1.6. Grouping and joining data
