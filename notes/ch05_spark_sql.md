@@ -69,6 +69,8 @@ example is as below, including:
 
 limitation: `toDF()` conversion is that all columns can only be `String` and `nullable`
 
+scala example: 
+
 ~~~scala
 // 1. `SparkSession` and `implicit` methods
 // wrapper around SparkContext and SQLContext
@@ -123,6 +125,62 @@ itPostsDF.printSchema
 //  |-- id: string (nullable = true)
 ~~~
 
+pyspark example: 
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+# 2. load data into RDD
+itPostsRows = sc.textFile("first-edition/ch05/italianPosts.csv")
+itPostsSplit = itPostsRows.map(lambda x: x.split("~"))
+
+# 3. convert each list<String> to a tuple
+itPostsRDD = itPostsSplit.map(lambda x: (x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12]))
+
+# 4. option 1: use `toDF` function convert the tuples to DataFrame
+# all columns can only be `String` and `nullable`
+itPostsDFrame = itPostsRDD.toDF()
+itPostsDFrame.show(10)
+# +---+--------------------+---+--------------------+---+--------------------+----+--------------------+--------------------+----+----+---+----+
+# | _1|                  _2| _3|                  _4| _5|                  _6|  _7|                  _8|                  _9| _10| _11|_12| _13|
+# +---+--------------------+---+--------------------+---+--------------------+----+--------------------+--------------------+----+----+---+----+
+# |  4|2013-11-11 18:21:...| 17|&lt;p&gt;The infi...| 23|2013-11-10 19:37:...|null|                    |                    |null|null|  2|1165|
+# |  5|2013-11-10 20:31:...| 12|&lt;p&gt;Come cre...|  1|2013-11-10 19:44:...|  61|Cosa sapreste dir...| &lt;word-choice&gt;|   1|null|  1|1166|
+# |  2|2013-11-10 20:31:...| 17|&lt;p&gt;Il verbo...|  5|2013-11-10 19:58:...|null|                    |                    |null|null|  2|1167|
+# |  1|2014-07-25 13:15:...|154|&lt;p&gt;As part ...| 11|2013-11-10 22:03:...| 187|Ironic constructi...|&lt;english-compa...|   4|1170|  1|1168|
+# |  0|2013-11-10 22:15:...| 70|&lt;p&gt;&lt;em&g...|  3|2013-11-10 22:15:...|null|                    |                    |null|null|  2|1169|
+# |  2|2013-11-10 22:17:...| 17|&lt;p&gt;There's ...|  8|2013-11-10 22:17:...|null|                    |                    |null|null|  2|1170|
+# |  1|2013-11-11 09:51:...| 63|&lt;p&gt;As other...|  3|2013-11-11 09:51:...|null|                    |                    |null|null|  2|1171|
+# |  1|2013-11-12 23:57:...| 63|&lt;p&gt;The expr...|  1|2013-11-11 10:09:...|null|                    |                    |null|null|  2|1172|
+# |  9|2014-01-05 11:13:...| 63|&lt;p&gt;When I w...|  5|2013-11-11 10:28:...| 122|Is &quot;scancell...|&lt;usage&gt;&lt;...|   3|1181|  1|1173|
+# |  0|2013-11-11 10:58:...| 18|&lt;p&gt;Wow, wha...|  5|2013-11-11 10:58:...|null|                    |                    |null|null|  2|1174|
+# +---+--------------------+---+--------------------+---+--------------------+----+--------------------+--------------------+----+----+---+----+
+# only showing top 10 rows
+
+# 5. option 2: assign columns names when invoking `toDF()` 
+# all columns can only be `String` and `nullable`
+itPostsDF = itPostsRDD.toDF(["commentCount", "lastActivityDate", "ownerUserId", "body", "score", "creationDate", "viewCount", "title", "tags", "answerCount", "acceptedAnswerId", "postTypeId", "id"])
+
+itPostsDF.printSchema()
+# root
+#  |-- commentCount: string (nullable = true)
+#  |-- lastActivityDate: string (nullable = true)
+#  |-- ownerUserId: string (nullable = true)
+#  |-- body: string (nullable = true)
+#  |-- score: string (nullable = true)
+#  |-- creationDate: string (nullable = true)
+#  |-- viewCount: string (nullable = true)
+#  |-- title: string (nullable = true)
+#  |-- tags: string (nullable = true)
+#  |-- answerCount: string (nullable = true)
+#  |-- acceptedAnswerId: string (nullable = true)
+#  |-- postTypeId: string (nullable = true)
+#  |-- id: string (nullable = true)
+~~~
+
 #### Approach 2: Converting RDDs to DataFrames using case classes
 
 map each `row` to a `case class` and then use the `toDF` method<br/>
@@ -134,6 +192,8 @@ below is an example, including:
 > 4. use the functions of the `implicit class StringImprovements` in `StringImplicits` to convert the RDD to `case object`</br>
 > 5. now the `DataFrame` contains the proper types and `nullable` flags
 itPostsDFCase.printSchema</br>
+
+scala example:
 
 ~~~scala
 // 1. SparkSession and implicit methods
@@ -213,6 +273,10 @@ itPostsDFCase.printSchema
 //  |-- postTypeId: long (nullable = true)
 //  |-- id: long (nullable = false) # nullable is false
 ~~~
+
+pyspark example:
+
+
 
 #### Converting RDDs to DataFrames by specifying a schema
 
