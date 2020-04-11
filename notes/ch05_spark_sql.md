@@ -669,18 +669,114 @@ postsDf.filter('postTypeId === 1)
 pyspark example:
 
 ~~~python
+# section 5.1.3
 from __future__ import print_function
+from pyspark.sql.functions import *
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+# 1. example 1: scalar function 
+# return a single value for each row based on calculations on one or more columns
+postsDf.filter(postsDf.postTypeId == 1).withColumn("activePeriod", datediff(postsDf.lastActivityDate, postsDf.creationDate)).orderBy(desc("activePeriod")).head().body.replace("&lt;","<").replace("&gt;",">")
+#<p>The plural of <em>braccio</em> is <em>braccia</em>, and the plural of <em>avambraccio</em> is <em>avambracci</em>.</p><p>Why are the plural of those words so different, if they both are referring to parts of the human body, and <em>avambraccio</em> derives from <em>braccio</em>?</p>
 
+# 2. example 2: window function
+# return a single value for a group of rows, also can be used with with `groupBy` (introduced in section 5.1.4)
+postsDf.select(avg(postsDf.score), max(postsDf.score), count(postsDf.score)).show()
 
+# 3. example 3: window function
+# define a “moving group” of rows (called frames) based on some calculations with current row.  
+# They don’t group rows into a single output row per group (different with ` aggregate functions`) 
+from pyspark.sql.window import Window
+winDf = postsDf.filter(
+		postsDf.postTypeId == 1
+	).select(
+		postsDf.ownerUserId, 
+		postsDf.acceptedAnswerId, 
+		postsDf.score,
+		max(
+			postsDf.score
+		).over(
+			Window.partitionBy(postsDf.ownerUserId)
+		).alias("maxPerUser")
+	)
+winDf.withColumn("toMax", winDf.maxPerUser - winDf.score).show(10)
+# +-----------+----------------+-----+----------+-----+
+# |ownerUserId|acceptedAnswerId|score|maxPerUser|toMax|
+# +-----------+----------------+-----+----------+-----+
+# |        232|            2185|    6|         6|    0|
+# |        833|            2277|    4|         4|    0|
+# |        833|            null|    1|         4|    3|
+# |        235|            2004|   10|        10|    0|
+# |        835|            2280|    3|         3|    0|
+# |         37|            null|    4|        13|    9|
+# |         37|            null|   13|        13|    0|
+# |         37|            2313|    8|        13|    5|
+# |         37|              20|   13|        13|    0|
+# |         37|            null|    4|        13|    9|
+# +-----------+----------------+-----+----------+-----+
+
+postsDf.filter(
+		postsDf.postTypeId == 1
+	).select(
+		postsDf.ownerUserId, 
+		postsDf.id, 
+		postsDf.creationDate, 
+		lag(postsDf.id, 1).over(Window.partitionBy(postsDf.ownerUserId).orderBy(postsDf.creationDate)).alias("prev"), 
+		lead(postsDf.id, 1).over(Window.partitionBy(postsDf.ownerUserId).orderBy(postsDf.creationDate)).alias("next")
+	).orderBy(
+		postsDf.ownerUserId, postsDf.id
+	).show()
+# +-----------+----+--------------------+----+----+
+# |ownerUserId|  id|        creationDate|prev|next|
+# +-----------+----+--------------------+----+----+
+# |          4|1637|2014-01-24 06:51:...|null|null|
+# |          8|   1|2013-11-05 20:22:...|null| 112|
+# |          8| 112|2013-11-08 13:14:...|   1|1192|
+# |          8|1192|2013-11-11 21:01:...| 112|1276|
+# |          8|1276|2013-11-15 16:09:...|1192|1321|
+# |          8|1321|2013-11-20 16:42:...|1276|1365|
+# |          8|1365|2013-11-23 09:09:...|1321|null|
+# |         12|  11|2013-11-05 21:30:...|null|  17|
+# |         12|  17|2013-11-05 22:17:...|  11|  18|
+# |         12|  18|2013-11-05 22:34:...|  17|  19|
+# |         12|  19|2013-11-05 22:38:...|  18|  63|
+# |         12|  63|2013-11-06 17:54:...|  19|  65|
+# |         12|  65|2013-11-06 18:07:...|  63|  69|
+# |         12|  69|2013-11-06 19:41:...|  65|  70|
+# |         12|  70|2013-11-06 20:35:...|  69|  89|
+# |         12|  89|2013-11-07 19:22:...|  70|  94|
+# |         12|  94|2013-11-07 20:42:...|  89| 107|
+# |         12| 107|2013-11-08 08:27:...|  94| 122|
+# |         12| 122|2013-11-08 20:55:...| 107|1141|
+# |         12|1141|2013-11-09 20:50:...| 122|1142|
+# +-----------+----+--------------------+----+----+
+
+# 4. example: UDF, user defined function
+# background: question tags are stored in the format of '&lt;tag_name&gt;', we want to know how many tags each question has
+countTags = udf(lambda (tags): tags.count("&lt;"), IntegerType())
+postsDf.filter(
+		postsDf.postTypeId == 1
+	).select(
+		"tags", countTags(postsDf.tags).alias("tagCnt")
+	).show(10, False)
+# +-------------------------------------------------------------------+------+
+# |tags                                                               |tagCnt|
+# +-------------------------------------------------------------------+------+
+# |&lt;word-choice&gt;                                                |1     |
+# |&lt;english-comparison&gt;&lt;translation&gt;&lt;phrase-request&gt;|3     |
+# |&lt;usage&gt;&lt;verbs&gt;                                         |2     |
+# |&lt;usage&gt;&lt;tenses&gt;&lt;english-comparison&gt;              |3     |
+# |&lt;usage&gt;&lt;punctuation&gt;                                   |2     |
+# |&lt;usage&gt;&lt;tenses&gt;                                        |2     |
+# |&lt;history&gt;&lt;english-comparison&gt;                          |2     |
+# |&lt;idioms&gt;&lt;etymology&gt;                                    |2     |
+# |&lt;idioms&gt;&lt;regional&gt;                                     |2     |
+# |&lt;grammar&gt;                                                    |1     |
+# +-------------------------------------------------------------------+------+
 ~~~
 
 <b>something more about `window function`: </b> </br>
 
 in the example above: `max('score).over(Window.partitionBy('ownerUserId)) as "maxPerUser"`</br>
-
 
 1. <b>`max('score)`</b>: agg-function for construct agg-column: 
 
