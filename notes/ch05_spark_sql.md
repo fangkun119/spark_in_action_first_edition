@@ -274,9 +274,7 @@ itPostsDFCase.printSchema
 //  |-- id: long (nullable = false) # nullable is false
 ~~~
 
-pyspark example:
-
-
+> no pyspark example
 
 #### Converting RDDs to DataFrames by specifying a schema
 
@@ -292,6 +290,8 @@ code is as below, including:
 > 3. define function convert the `String`(a element/record) to `Row`(with schema)</br>
 > 4. create an RDD and the DataFrame</br>
 > 5. get schema information</br>
+
+scala example:
 
 ~~~scala
 // 1. SparkSession and implicit methods
@@ -342,10 +342,10 @@ def stringToRow(row:String):Row = {
     r(12).toLong)
 }
 
-// 4. create an RDD and the DataFrame
+// 4. create a RDD as input example
 val rowRDD = itPostsRows.map(row => stringToRow(row))
 
-// 5. get schema information
+// 5. convert RDD to DataFrame
 val itPostsDFStruct = spark.createDataFrame(rowRDD, postSchema)
 itPostsDFStruct.columns
 // 	res0: Array[String] = Array(
@@ -353,6 +353,81 @@ itPostsDFStruct.columns
 itPostsDFStruct.dtypes
 //	res1: Array[(String, String)] = Array(
 //		(commentCount,IntegerType), (lastActivityDate,TimestampType), (ownerUserId,LongType), (body,StringType), (score,IntegerType), (creationDate,TimestampType), (viewCount,IntegerType), (title,StringType), (tags,StringType), (answerCount,IntegerType), (acceptedAnswerId,LongType), (postTypeId,LongType), (id,LongType))
+~~~
+
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+# 2. util functions for converting data types
+from pyspark.sql import Row
+from datetime import datetime
+def toIntSafe(inval):
+  try:
+    return int(inval)
+  except ValueError:
+    return None
+
+def toTimeSafe(inval):
+  try:
+    return datetime.strptime(inval, "%Y-%m-%d %H:%M:%S.%f")
+  except ValueError:
+    return None
+
+def toLongSafe(inval):
+  try:
+    return long(inval)
+  except ValueError:
+    return None
+
+# 3. function to convert type of fields in a row
+def stringToPost(row):
+  r = row.encode('utf8').split("~")
+  return Row(
+    toIntSafe(r[0]),
+    toTimeSafe(r[1]),
+    toIntSafe(r[2]),
+    r[3],
+    toIntSafe(r[4]),
+    toTimeSafe(r[5]),
+    toIntSafe(r[6]),
+    toIntSafe(r[7]),
+    r[8],
+    toIntSafe(r[9]),
+    toLongSafe(r[10]),
+    toLongSafe(r[11]),
+    long(r[12]))
+
+# 4. define the DataFrame schema
+from pyspark.sql.types import *
+postSchema = StructType([
+  StructField("commentCount", IntegerType(), True),
+  StructField("lastActivityDate", TimestampType(), True),
+  StructField("ownerUserId", LongType(), True),
+  StructField("body", StringType(), True),
+  StructField("score", IntegerType(), True),
+  StructField("creationDate", TimestampType(), True),
+  StructField("viewCount", IntegerType(), True),
+  StructField("title", StringType(), True),
+  StructField("tags", StringType(), True),
+  StructField("answerCount", IntegerType(), True),
+  StructField("acceptedAnswerId", LongType(), True),
+  StructField("postTypeId", LongType(), True),
+  StructField("id", LongType(), False)
+  ])
+
+# 5. create RDD as the input example
+rowRDD = itPostsRows.map(lambda x: stringToPost(x))
+
+# 6. convert the RDD into DataFrame
+itPostsDFStruct = sqlContext.createDataFrame(rowRDD, postSchema)
+itPostsDFStruct.printSchema()
+itPostsDFStruct.columns
+itPostsDFStruct.dtypes
 ~~~
 
 ### 5.1.2. DataFrame API basics
@@ -413,6 +488,17 @@ postsDf.filter('postTypeId === 1)
     .show
 ~~~
 
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
+~~~
+
 ### 5.1.3. Using SQL functions to perform calculations on data
 
 4 types of SQL functions: <br/>
@@ -431,14 +517,14 @@ postsDf.filter('postTypeId === 1)
 
 (4) `User-defined functions` include custom scalar or aggregate functions
 
-
-
 examples are as below, including:
 
 > 1. example 1: scalar function</br>
 > 2. example 2: aggregation function</br>
 > 3. example 3: window function</br>
 > 4. example 4: UDF, user defined function</br>
+
+scala example:
 
 ~~~scala
 // 1. example 1: scalar function 
@@ -531,6 +617,17 @@ postsDf.filter('postTypeId === 1)
 // +------------------------------------------------------------------+------+
 ~~~
 
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
+~~~
+
 <b>something more about `window function`: </b> </br>
 
 in the example above: `max('score).over(Window.partitionBy('ownerUserId)) as "maxPerUser"`</br>
@@ -561,6 +658,8 @@ example is as below, including: </br>
 > 3. replace null and NaN values with a constant</br>
 > 4. replace certain values in specific columns with different ones</br>
 
+scala example: 
+
 ~~~scala
 // 1. removes rows that have `null` values in all of the columns
 val cleanPosts = postsDf.na.drop()
@@ -576,6 +675,19 @@ postsDf.na.fill(Map("viewCount" -> 0))
 val postsDfCorrected = postsDf.na.replace(Array("id", "acceptedAnswerId"), Map(1177 -> 3000))
 ~~~
 
+pyspark example:
+
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
+~~~
+
 ### 5.1.5. Converting DataFrames to RDDs
 
 example is as below, including: 
@@ -583,6 +695,8 @@ example is as below, including:
 > 1. use `rdd` method of `DataFrame` to convert</br>
 > 2. use `map`, `flatMap`, `mapPartitions` method to covert</br>
 > 3. keep the `DataFrame` schema and convert the RDD back to `DataFrame`</br>
+
+scala example: 
 
 ~~~scala
 // 1. use `rdd` method of `DataFrame` to convert
@@ -615,6 +729,17 @@ val spark = SparkSession.builder().getOrElse()
 val postsDfNew = spark.createDataFrame(postsMapped, postsDf.schema)
 ~~~
 
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
+~~~
+
 ### 5.1.6. Grouping and joining data
 
 #### 5.1.6.1. group by
@@ -638,7 +763,7 @@ aggragate functions
 (3) details: [http://mng.bz/Gbt3](http://mng.bz/Gbt3)</br>
 (4) Java example: [http://mng.bz/5bOb](http://mng.bz/5bOb)
 
-example: 
+scala example: 
 
 ~~~scala
 postsDfNew
@@ -708,13 +833,24 @@ postsDfNew
 // +-----------+---------------------+----------------+
 ~~~
 
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
+~~~
+
 #### 5.1.6.2. rollup function and cube function
 
 <b>rollup function</b>
 
 > compared with `groupBy`, `rollup` respects the hierarchy of the input columns and always groups by the first column
 
-example 
+scala example: 
 
 ~~~scala
 // 1. sample data frame
@@ -747,6 +883,17 @@ smplDf.rollup('ownerUserId, 'tags, 'postTypeId)
 // |         15|null|      null|    2|
 // |       null|null|      null|    5|
 // +-----------+----+----------+-----+
+~~~
+
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
 ~~~
 
 <b>cube function</b>
@@ -821,6 +968,17 @@ val postsVotesOuter
 
 // postId is unique across both DataFrames, 
 // which make it Ok to use implicit conversion from Scala's Symbol ('postaId)
+~~~
+
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
 ~~~
 
 > Notice: `spark.sql.shuffle.partitions` has influence on performance, currently it is a fixed parameter rather then depending on the data and runtime environment </br>
@@ -907,6 +1065,17 @@ spark.catalog.listColumns("votes").show()
 
 // get a list of all available SQL functions call
 spark.catalog.listFunctions.show()
+~~~
+
+pyspark example:
+
+~~~python
+from __future__ import print_function
+
+# 1. `SparkSession` and `implicit` methods
+# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+
+
 ~~~
 
 > other functions of catalog: `cacheTable`, `uncacheTable`, `isCached`, `clearCache`, ...
