@@ -1013,10 +1013,53 @@ pyspark example:
 ~~~python
 from __future__ import print_function
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+postsDfNew.groupBy(postsDfNew.ownerUserId, postsDfNew.tags, postsDfNew.postTypeId).count().orderBy(postsDfNew.ownerUserId.desc()).show(10)
+#+-----------+--------------------+----------+-----+
+#|ownerUserId|                tags|postTypeId|count|
+#+-----------+--------------------+----------+-----+
+#|        862|                    |         2|    1|
+#|        855|         <resources>|         1|    1|
+#|        846|<translation><eng...|         1|    1|
+#|        845|<word-meaning><tr...|         1|    1|
+#|        842|  <verbs><resources>|         1|    1|
+#|        835|    <grammar><verbs>|         1|    1|
+#|        833|                    |         2|    1|
+#|        833|           <meaning>|         1|    1|
+#|        833|<meaning><article...|         1|    1|
+#|        814|                    |         2|    1|
+#+-----------+--------------------+----------+-----+
 
-
+postsDfNew.groupBy(postsDfNew.ownerUserId).agg(max(postsDfNew.lastActivityDate), max(postsDfNew.score)).show(10)
+postsDfNew.groupBy(postsDfNew.ownerUserId).agg({"lastActivityDate": "max", "score": "max"}).show(10)
+# +-----------+---------------------+----------+
+# |ownerUserId|max(lastActivityDate)|max(score)|
+# +-----------+---------------------+----------+
+# |        431| 2014-02-16 14:16:...|         1|
+# |        232| 2014-08-18 20:25:...|         6|
+# |        833| 2014-09-03 19:53:...|         4|
+# |        633| 2014-05-15 22:22:...|         1|
+# |        634| 2014-05-27 09:22:...|         6|
+# |        234| 2014-07-12 17:56:...|         5|
+# |        235| 2014-08-28 19:30:...|        10|
+# |        435| 2014-02-18 13:10:...|        -2|
+# |        835| 2014-08-26 15:35:...|         3|
+# |         37| 2014-09-13 13:29:...|        23|
+# +-----------+---------------------+----------+
+postsDfNew.groupBy(postsDfNew.ownerUserId).agg(max(postsDfNew.lastActivityDate), max(postsDfNew.score) > 5).show(10)
+# +-----------+---------------------+----------------+
+# |ownerUserId|max(lastActivityDate)|(max(score) > 5)|
+# +-----------+---------------------+----------------+
+# |        431| 2014-02-16 14:16:...|           false|
+# |        232| 2014-08-18 20:25:...|            true|
+# |        833| 2014-09-03 19:53:...|           false|
+# |        633| 2014-05-15 22:22:...|           false|
+# |        634| 2014-05-27 09:22:...|            true|
+# |        234| 2014-07-12 17:56:...|           false|
+# |        235| 2014-08-28 19:30:...|            true|
+# |        435| 2014-02-18 13:10:...|           false|
+# |        835| 2014-08-26 15:35:...|           false|
+# |         37| 2014-09-13 13:29:...|            true|
+# +-----------+---------------------+----------------+
 ~~~
 
 #### 5.1.6.2. rollup function and cube function
