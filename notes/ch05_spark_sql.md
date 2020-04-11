@@ -1013,7 +1013,12 @@ pyspark example:
 ~~~python
 from __future__ import print_function
 
-postsDfNew.groupBy(postsDfNew.ownerUserId, postsDfNew.tags, postsDfNew.postTypeId).count().orderBy(postsDfNew.ownerUserId.desc()).show(10)
+postsDfNew.groupBy(
+		postsDfNew.ownerUserId, postsDfNew.tags, postsDfNew.postTypeId
+	).count(
+	).orderBy(
+		postsDfNew.ownerUserId.desc()
+	).show(10)
 #+-----------+--------------------+----------+-----+
 #|ownerUserId|                tags|postTypeId|count|
 #+-----------+--------------------+----------+-----+
@@ -1029,8 +1034,16 @@ postsDfNew.groupBy(postsDfNew.ownerUserId, postsDfNew.tags, postsDfNew.postTypeI
 #|        814|                    |         2|    1|
 #+-----------+--------------------+----------+-----+
 
-postsDfNew.groupBy(postsDfNew.ownerUserId).agg(max(postsDfNew.lastActivityDate), max(postsDfNew.score)).show(10)
-postsDfNew.groupBy(postsDfNew.ownerUserId).agg({"lastActivityDate": "max", "score": "max"}).show(10)
+postsDfNew.groupBy(
+		postsDfNew.ownerUserId
+	).agg(
+		max(postsDfNew.lastActivityDate), max(postsDfNew.score)
+	).show(10)
+postsDfNew.groupBy(
+		postsDfNew.ownerUserId
+	).agg(
+		{"lastActivityDate": "max", "score": "max"}
+	).show(10)
 # +-----------+---------------------+----------+
 # |ownerUserId|max(lastActivityDate)|max(score)|
 # +-----------+---------------------+----------+
@@ -1045,7 +1058,12 @@ postsDfNew.groupBy(postsDfNew.ownerUserId).agg({"lastActivityDate": "max", "scor
 # |        835| 2014-08-26 15:35:...|         3|
 # |         37| 2014-09-13 13:29:...|        23|
 # +-----------+---------------------+----------+
-postsDfNew.groupBy(postsDfNew.ownerUserId).agg(max(postsDfNew.lastActivityDate), max(postsDfNew.score) > 5).show(10)
+
+postsDfNew.groupBy(
+		postsDfNew.ownerUserId
+	).agg(
+		max(postsDfNew.lastActivityDate), max(postsDfNew.score) > 5
+	).show(10)
 # +-----------+---------------------+----------------+
 # |ownerUserId|max(lastActivityDate)|(max(score) > 5)|
 # +-----------+---------------------+----------------+
@@ -1108,18 +1126,69 @@ pyspark example:
 ~~~python
 from __future__ import print_function
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+# 1. sample data frame
+smplDf = postsDfNew.where((postsDfNew.ownerUserId >= 13) & (postsDfNew.ownerUserId <= 15))
+smplDf.groupBy(smplDf.ownerUserId, smplDf.tags, smplDf.postTypeId).count().show()
+# +-----------+----+----------+-----+
+# |ownerUserId|tags|postTypeId|count|
+# +-----------+----+----------+-----+
+# |         15|    |         2|    2|
+# |         14|    |         2|    2|
+# |         13|    |         2|    1|
+# +-----------+----+----------+-----+
 
-
+# 2. rollup
+smplDf.rollup(smplDf.ownerUserId, smplDf.tags, smplDf.postTypeId).count().show()
+# +-----------+----+----------+-----+
+# |ownerUserId|tags|postTypeId|count|
+# +-----------+----+----------+-----+
+# |         15|    |         2|    2|
+# |         13|    |      null|    1|
+# |         13|null|      null|    1|
+# |         14|    |      null|    2|
+# |         13|    |         2|    1|
+# |         14|null|      null|    2|
+# |         15|    |      null|    2|
+# |         14|    |         2|    2|
+# |         15|null|      null|    2|
+# |       null|null|      null|    5|
+# +-----------+----+----------+-----+
 ~~~
 
 <b>cube function</b>
 
 > `cube` function returns all of these results, but also adds other possible subtotals (per post type, per tags, per post type and tags, per post type and user)
 
+scala example: 
+
 ~~~scala
 smplDf.cube('ownerUserId, 'tags, 'postTypeId).count.show()
+~~~
+
+pyspark example:
+
+~~~python
+smplDf.cube(smplDf.ownerUserId, smplDf.tags, smplDf.postTypeId).count().show()
+# +-----------+----+----------+-----+
+# |ownerUserId|tags|postTypeId|count|
+# +-----------+----+----------+-----+
+# |         15|    |         2|    2|
+# |       null|    |         2|    5|
+# |         13|    |      null|    1|
+# |         15|null|         2|    2|
+# |       null|null|         2|    5|
+# |         13|null|      null|    1|
+# |         14|    |      null|    2|
+# |         13|    |         2|    1|
+# |         14|null|      null|    2|
+# |         15|    |      null|    2|
+# |         13|null|         2|    1|
+# |       null|    |      null|    5|
+# |         14|    |         2|    2|
+# |         15|null|      null|    2|
+# |       null|null|      null|    5|
+# |         14|null|         2|    2|
+# +-----------+----+----------+-----+
 ~~~
 
 #### 5.1.6.3. Spark SQL Configuration
@@ -1128,7 +1197,8 @@ these configuration will affect the execution of DataFrame operations and SQL co
 
 > Spark Configuration (introducted in chapter 10) can not changed in run-time, </br>
 > but Spark SQL Configuration can</br>
-> example is as below: 
+
+scala example: 
 
 ~~~scala
 import org.apache.spark.sql.SparkSession 
@@ -1139,6 +1209,17 @@ val spark = SparkSession.builder().getOrElse()
 spark.sql("SET spark.sql.caseSensitive=true")
 // set configuration by invoking method
 spark.conf.set("spark.sql.caseSensitive", "true")
+~~~
+
+spark example: 
+
+~~~python
+# case sensitivity for query analysis (table and column names)
+# set configuration by SQL command
+sqlContext.sql("SET spark.sql.caseSensitive=true")
+
+# set configuration by invoking method
+sqlContext.setConf("spark.sql.caseSensitive", "true")
 ~~~
 
 another configuration: `spark.sql.eagerAnalysis`
@@ -1152,7 +1233,7 @@ join types: `inner`, `outer`, `left_outer`, `right_outer`, or `leftsemi`, `lefta
 example: 
 
 ~~~scala
-// 1. load the raw data
+// 1. load data
 val itVotesRaw = 
 	sc.textFile("first-edition/ch05/italianVotes.csv").
   	map(x => x.split("~"))
@@ -1171,16 +1252,16 @@ val votesSchema = StructType(Seq(
 	StructField("voteTypeId", IntegerType, false),
 	StructField("creationDate", TimestampType, false)) )
 
-// 3. create the DataFrame based on the Rows and Schema
+// 4. create the DataFrame based on the Rows and Schema
 import org.apache.spark.sql.SparkSession 
 val spark = SparkSession.builder().getOrElse() 
 val votesDf = spark.createDataFrame(itVotesRows, votesSchema)
 
-// 4. inner Join by postId
+// 5. inner Join by postId
 val postsVotes 
 	= postsDf.join(votesDf, postsDf("id") === 'postId)
 
-// 5 outer Join by postId
+// 6. outer Join by postId
 val postsVotesOuter
 	= postsDf.join(votesDf, postsDf("id") === 'postId, "outer")
 
@@ -1193,10 +1274,28 @@ pyspark example:
 ~~~python
 from __future__ import print_function
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
+# 1. load data
+itVotesRaw = sc.textFile("first-edition/ch05/italianVotes.csv").map(lambda x: x.split("~"))
 
+# 2. convert to Rows
+itVotesRows = itVotesRaw.map(lambda row: Row(id=long(row[0]), postId=long(row[1]), voteTypeId=int(row[2]), creationDate=datetime.strptime(row[3], "%Y-%m-%d %H:%M:%S.%f")))
 
+# 3. define schema
+votesSchema = StructType([
+  StructField("creationDate", TimestampType(), False),
+  StructField("id", LongType(), False),
+  StructField("postId", LongType(), False),
+  StructField("voteTypeId", IntegerType(), False)
+  ])  
+
+# 4. create the DataFrame based on the rows and schema
+votesDf = sqlContext.createDataFrame(itVotesRows, votesSchema)
+
+# 5. inner join by postId
+postsVotes = postsDf.join(votesDf, postsDf.id == votesDf.postId)
+
+# 6. outer Join by postId
+postsVotesOuter = postsDf.join(votesDf, postsDf.id == votesDf.postId, "outer")
 ~~~
 
 > Notice: `spark.sql.shuffle.partitions` has influence on performance, currently it is a fixed parameter rather then depending on the data and runtime environment </br>
@@ -1208,6 +1307,8 @@ from __future__ import print_function
 > `DataFrames` are now simply implemented as `DataSets` containing `Row` objects.
 
 convert `DataFrame` to `DataSet` 
+
+scala example: 
 
 ~~~scala
 // convert `DataFrame` to `DataSet`: using `DataFrame.as(u:Encoder)` function
@@ -1285,15 +1386,17 @@ spark.catalog.listColumns("votes").show()
 spark.catalog.listFunctions.show()
 ~~~
 
-pyspark example:
+pyspark example: 
 
 ~~~python
-from __future__ import print_function
+# create temporary table definitions
+# DataFrame定义为临时表（随Spark关闭后会失效）
+postsDf.registerTempTable("posts_temp")
 
-# 1. `SparkSession` and `implicit` methods
-# sc is SparkSession, this variable is initialized when starting PySpark shell, please refer to related docs or previouse chapter of this book
-
-
+# registering tables permanently
+# DataFrame定义为持久表（需要Spark支持HQL）
+postsDf.write.saveAsTable("posts")
+votesDf.write.saveAsTable("votes")
 ~~~
 
 > other functions of catalog: `cacheTable`, `uncacheTable`, `isCached`, `clearCache`, ...
@@ -1332,11 +1435,19 @@ initialize the metastore database and create the necessary tables</br>
 
 #### Execute SQL
 
+scala example: 
+
 ~~~scala
 import spark.sql
 
 // need register DataFrame as table first as in previouse section
 val resultDf = sql("select * from posts") //result is a DataFrame
+~~~
+
+pyspark example:
+
+~~~python
+resultDf = sqlContext.sql("select * from posts")
 ~~~
 
 If using Spark Session with Hive Support, all Hive DLL Command like `ALTER TALBE`, `DROP TABLE` are supported
@@ -1357,8 +1468,7 @@ $ spark-sql
 execute SQL in spark-shell
 
 ~~~bash
-spark-sql> select substring(title, 0, 70) from posts where
-  postTypeId = 1 order by creationDate desc limit 3;
+spark-sql> select substring(title, 0, 70) from posts where postTypeId = 1 order by creationDate desc limit 3;
 # Verbo impersonale che regge verbo impersonale: costruzione implicita? Perch?Š si chiama &quot;saracinesca&quot; la chiusura metallica scorren Perch?Š a volte si scrive l'accento acuto sulla &quot;i&quot; o sulla & 
 # Time taken: 0.375 seconds, Fetched 3 row(s)
 ~~~
@@ -1425,7 +1535,9 @@ Beeline version 1.5.0 by Apache Hive
 
 ### 5.4.2. Saving data
 
-~~~
+scala example:
+
+~~~scala
 // postsDf: DataFrame
 // postsDf.write: DataFrameWriter
 postsDf.write.saveAsTable("posts")
@@ -1439,6 +1551,8 @@ functions of `DataFrameWriter`:
 #### configuring the writer
 
 `DataFrameWriter` has functions to configure the write behavior like below
+
+scala example:
 
 ~~~scala
 postsDf.write
@@ -1458,6 +1572,8 @@ options | for datasource configuration | parameter name-value map |
 
 #### using the `saveAsTable` method
 
+scala example:
+
 ~~~scala
 // save into table with name "postsjson" by "json" format
 // table type: 
@@ -1474,6 +1590,14 @@ postsDf.write
 ~~~bash
 # each line will be a json object
 scala> sql("select * from postsjson")
+~~~
+
+pyspark example: 
+
+~~~python
+postsDf.write.format("json").saveAsTable("postsjson")
+
+sqlContext.sql("select * from postsjson")
 ~~~
 
 #### using the `insertInto` method
@@ -1497,12 +1621,21 @@ parquet(...) | format("parquet").save(...) |
 
 #### saving data to relational databases with JDBC
 
+scala example:
+
 ~~~scala
 val props = new java.util.Properties()
 props.setProperty("user", "user")
 props.setProperty("password", "password")
 postsDf.write
     jdbc("jdbc:postgresql://postgresrv/mydb", "posts", props)
+~~~
+
+pyspark example:
+
+~~~python
+props = {"user": "user", "password": "password"}
+postsDf.write.jdbc("jdbc:postgresql:#postgresrv/mydb", "posts", properties=props)
 ~~~
 
 should not have too many `partition`s in the dataframe 
@@ -1514,6 +1647,8 @@ set `spark.executor.extraClassPath` in Spark configuration (chapter 10) will mak
 ### 5.4.3. Loading data
 
 #### load a DataFrame from a table registered in the Hive metastore
+
+scala example:
 
 ~~~scala
 // spark session
@@ -1527,7 +1662,16 @@ val postsDf1 = spark   // SparkSession
 val postsDf2 = spark.table("posts")
 ~~~
 
+pyspark example: 
+
+~~~python
+postsDf = sqlContext.read.table("posts")
+postsDf = sqlContext.table("posts")
+~~~
+
 #### Loading data from relational databases using JDBC
+
+scala example:
 
 ~~~scala
 // spark session
@@ -1548,9 +1692,22 @@ val result = spark  # SparkSession
             )
 ~~~
 
+pyspark example: 
+
+~~~python
+result = sqlContext.read.jdbc(
+				"jdbc:postgresql:#postgresrv/mydb", 
+				"posts", 
+				predicates=["viewCount > 3"], 
+				properties=props
+			)
+~~~
+
 #### Loading data from data sources registered using SQL
 
 register temporary tables from `jdbc` data source and load it
+
+scala example: 
 
 ~~~bash
 scala> sql("CREATE TEMPORARY TABLE postsjdbc "+
@@ -1564,13 +1721,36 @@ scala> sql("CREATE TEMPORARY TABLE postsjdbc "+
 scala> val result = sql("select * from postsjdbc")
 ~~~
 
+pyspark example: 
+
+~~~python
+sqlContext.sql("CREATE TEMPORARY TABLE postsjdbc "+
+  "USING org.apache.spark.sql.jdbc "+
+  "OPTIONS ("+
+    "url 'jdbc:postgresql:#postgresrv/mydb',"+
+    "dbtable 'posts',"+
+    "user 'user',"+
+    "password 'password')")
+~~~
+
 register a Parquet file and load it's content
+
+scala example: 
 
 ~~~bash
 scala> sql("CREATE TEMPORARY TABLE postsParquet "+
   "USING org.apache.spark.sql.parquet "+
   "OPTIONS (path '/path/to/parquet_file')")
 scala> val resParq = sql("select * from postsParquet")
+~~~
+
+pyspark example: 
+
+~~~python
+sqlContext.sql("CREATE TEMPORARY TABLE postsParquet "+
+  "USING org.apache.spark.sql.parquet "+
+  "OPTIONS (path '/path/to/parquet_file')")
+resParq = sql("select * from postsParquet")
 ~~~
 
 ## 5.5. Catalyst optimizer
@@ -1582,6 +1762,47 @@ scala> val resParq = sql("select * from postsParquet")
 #### Taking advantage of partition statistics
 
 [https://livebook.manning.com/book/spark-in-action/chapter-5/415](https://livebook.manning.com/book/spark-in-action/chapter-5/415)
+
+#### Examples 
+
+scala example: 
+
+~~~scala
+val postsFiltered = postsDf.filter('postTypeId === 1).withColumn("ratio", 'viewCount / 'score).where('ratio < 35)
+postsFiltered.explain(true)
+~~~
+
+pyspark example: 
+
+~~~python
+postsRatio = postsDf.filter(postsDf.postTypeId == 1).withColumn("ratio", postsDf.viewCount / postsDf.score)
+postsFiltered = postsRatio.where(postsRatio.ratio < 35)
+postsFiltered.explain(True)
+# == Parsed Logical Plan ==
+# 'Filter (ratio#314 < 35)
+# +- Project [commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L,(cast(viewCount#291 as double) / cast(score#289 as double)) AS ratio#314]
+#    +- Filter (postTypeId#296L = cast(1 as bigint))
+#       +- Subquery posts
+#          +- Relation[commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L] ParquetRelation
+# 
+# == Analyzed Logical Plan ==
+# commentCount: int, lastActivityDate: timestamp, ownerUserId: bigint, body: string, score: int, creationDate: timestamp, viewCount: int, title: string, tags: string, answerCount: int, acceptedAnswerId: bigint, postTypeId: bigint, id: bigint, ratio: double
+# Filter (ratio#314 < cast(35 as double))
+# +- Project [commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L,(cast(viewCount#291 as double) / cast(score#289 as double)) AS ratio#314]
+#    +- Filter (postTypeId#296L = cast(1 as bigint))
+#       +- Subquery posts
+#          +- Relation[commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L] ParquetRelation
+# 
+# == Optimized Logical Plan ==
+# Project [commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L,(cast(viewCount#291 as double) / cast(score#289 as double)) AS ratio#314]
+# +- Filter ((postTypeId#296L = 1) && ((cast(viewCount#291 as double) / cast(score#289 as double)) < 35.0))
+#    +- Relation[commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L] ParquetRelation
+# 
+# == Physical Plan ==
+# Project [commentCount#285,lastActivityDate#286,ownerUserId#287L,body#288,score#289,creationDate#290,viewCount#291,title#292,tags#293,answerCount#294,acceptedAnswerId#295L,postTypeId#296L,id#297L,(cast(viewCount#291 as double) / cast(score#289 as double)) AS ratio#314]
+# +- Filter (((cast(viewCount#291 as double) / cast(score#289 as double)) < 35.0) && (postTypeId#296L = 1))
+#    +- Scan ParquetRelation[lastActivityDate#286,commentCount#285,acceptedAnswerId#295L,title#292,id#297L,postTypeId#296L,ownerUserId#287L,score#289,tags#293,viewCount#291,body#288,creationDate#290,answerCount#294] InputPaths: file:/user/hive/warehouse/posts, PushedFilters: [EqualTo(postTypeId,1)]
+~~~
 
 ## 5.6. Performance improvements with Tungsten
 
