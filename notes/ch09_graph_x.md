@@ -29,8 +29,6 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-[TOC]
-
 # CH09 Spark GraphX
 
 > 原书章节：[https://livebook.manning.com/book/spark-in-action/chapter-9/](https://livebook.manning.com/book/spark-in-action/chapter-9/)
