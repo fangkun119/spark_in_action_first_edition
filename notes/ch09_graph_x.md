@@ -1,3 +1,34 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+<!--**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*-->
+
+- [CH09 Spark GraphX](#ch09-spark-graphx)
+  - [9.1. 使用GraphX API](#91-%E4%BD%BF%E7%94%A8graphx-api)
+    - [9.1.1. 创建图对象：`Graph`](#911-%E5%88%9B%E5%BB%BA%E5%9B%BE%E5%AF%B9%E8%B1%A1graph)
+    - [9.1.2. 图对象的Transforming操作](#912-%E5%9B%BE%E5%AF%B9%E8%B1%A1%E7%9A%84transforming%E6%93%8D%E4%BD%9C)
+      - [(1) 对Edges / Vertics 进行Mapping操作](#1-%E5%AF%B9edges--vertics-%E8%BF%9B%E8%A1%8Cmapping%E6%93%8D%E4%BD%9C)
+        - [`mapEdges`：对所有edge的属性进行修改](#mapedges%E5%AF%B9%E6%89%80%E6%9C%89edge%E7%9A%84%E5%B1%9E%E6%80%A7%E8%BF%9B%E8%A1%8C%E4%BF%AE%E6%94%B9)
+        - [`mapVertices`：对所有顶点的属性进行修改](#mapvertices%E5%AF%B9%E6%89%80%E6%9C%89%E9%A1%B6%E7%82%B9%E7%9A%84%E5%B1%9E%E6%80%A7%E8%BF%9B%E8%A1%8C%E4%BF%AE%E6%94%B9)
+        - [`mapTriplets`：借助`<src, edge, dst>`三元组的数据对所有edge的属性进行修改](#maptriplets%E5%80%9F%E5%8A%A9src-edge-dst%E4%B8%89%E5%85%83%E7%BB%84%E7%9A%84%E6%95%B0%E6%8D%AE%E5%AF%B9%E6%89%80%E6%9C%89edge%E7%9A%84%E5%B1%9E%E6%80%A7%E8%BF%9B%E8%A1%8C%E4%BF%AE%E6%94%B9)
+      - [(2) `arrgegatingMessages`方法](#2-arrgegatingmessages%E6%96%B9%E6%B3%95)
+      - [(3) `原始Graph` join `由arrgegatingMessages聚合得到的VertexRDD`](#3-%E5%8E%9F%E5%A7%8Bgraph-join-%E7%94%B1arrgegatingmessages%E8%81%9A%E5%90%88%E5%BE%97%E5%88%B0%E7%9A%84vertexrdd)
+      - [(4) 图子集：选取图的一部分](#4-%E5%9B%BE%E5%AD%90%E9%9B%86%E9%80%89%E5%8F%96%E5%9B%BE%E7%9A%84%E4%B8%80%E9%83%A8%E5%88%86)
+        - [(a) `subgraph`](#a-subgraph)
+        - [(b) `mask`](#b-mask)
+        - [(c) `filter`](#c-filter)
+      - [(5) GraphX的Pregel Implementation](#5-graphx%E7%9A%84pregel-implementation)
+  - [9.2. 使用Spark GraphX内置的图算法](#92-%E4%BD%BF%E7%94%A8spark-graphx%E5%86%85%E7%BD%AE%E7%9A%84%E5%9B%BE%E7%AE%97%E6%B3%95)
+    - [9.2.1. 本章使用的数据集](#921-%E6%9C%AC%E7%AB%A0%E4%BD%BF%E7%94%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E9%9B%86)
+      - [(1) 数据集介绍](#1-%E6%95%B0%E6%8D%AE%E9%9B%86%E4%BB%8B%E7%BB%8D)
+      - [(2) 加载数据集创建图](#2-%E5%8A%A0%E8%BD%BD%E6%95%B0%E6%8D%AE%E9%9B%86%E5%88%9B%E5%BB%BA%E5%9B%BE)
+    - [9.2.2. 最短路径算法](#922-%E6%9C%80%E7%9F%AD%E8%B7%AF%E5%BE%84%E7%AE%97%E6%B3%95)
+    - [9.2.3. Page Rank算法](#923-page-rank%E7%AE%97%E6%B3%95)
+    - [9.2.4. Connected Components算法](#924-connected-components%E7%AE%97%E6%B3%95)
+    - [9.2.5. Strongly Connected Components算法](#925-strongly-connected-components%E7%AE%97%E6%B3%95)
+  - [9.3. 实现A*搜索算法](#93-%E5%AE%9E%E7%8E%B0a%E6%90%9C%E7%B4%A2%E7%AE%97%E6%B3%95)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 [TOC]
 
 # CH09 Spark GraphX
@@ -342,7 +373,7 @@ Superstep：Pregel 的执行由一组superstep组成，通过Pregel对象的appl
 
 其中的initial superstep会在所有顶点上执行，而后续superstep只会在收到消息的顶点上执行，当没有新的消息被发出或者到达最大迭代次数时，方法执行结束
 
-## 9.2. Graph algorithms
+## 9.2. 使用Spark GraphX内置的图算法
 
 > 本章介绍几种Spark图算法
 >
@@ -402,20 +433,151 @@ Superstep：Pregel 的执行由一组superstep组成，通过Pregel对象的appl
 > // Long = 4592，与链接向连的vertex的数量
 > ~~~
 
-### 9.2.2. Shortest-paths algorithm
+### 9.2.2. 最短路径算法
 
-### 9.2.3. Page rank
+最短路径算法
 
-### 9.2.4. Connected components
+> 给一个起始顶点，最短路径算法图中每一个顶点到达这个起始顶点所需要遵循的最小边
 
-### 9.2.5. Strongly connected components
+代码
 
-## 9.3. Implementing the A* search algorithm
+> 找到两个文章的顶点ID
+>
+> ~~~scala
+> articles.
+> 	// 标题为Rainbow或者14th_centry的文章
+> 	filter(x => x._1 == "Rainbow" || x._1 == "14th_century").
+> 	collect().
+> 	foreach(println)
+> // 找到文章ID：10和3425
+> // (14th_century,10) 
+> // (Rainbow,3425)
+> ~~~
+>
+> 调用最短路径算法
+>
+> ~~~scala
+> import org.apache.spark.graphx.lib._
+> val shortest = ShortestPaths.run(wikigraph, Seq(10)) // 文章14th_century
+> ~~~
+>
+> 查找计算结果
+>
+> ~~~scala
+> scala> shortest.vertices.filter(x => x._1 == 3425).collect.foreach(println)
+> (3425,Map(1772 -> 2)) // 需要两个链接可以跳转到
+> ~~~
 
-### 9.3.1. Understanding the A* algorithm
+### 9.2.3. Page Rank算法
 
-### 9.3.2. Implementing the A* algorithm
+> ~~~scala
+> val ranked = wikigraph.pageRank(0.001)
+> 
+> val ordering = new Ordering[Tuple2[VertexId,Double]] {
+>   def compare(x:Tuple2[VertexId, Double], y:Tuple2[VertexId, Double]):Int =
+>     x._2.compareTo(y._2) }
+> val top10 = ranked.vertices.top(10)(ordering)
+> 
+> sc.parallelize(top10).join(articles.map(_.swap)).collect.
+>   sortWith((x, y) => x._2._1 > y._2._1).foreach(println)
+> // (4297,(43.064871681422574,United_States))
+> // (1568,(29.02695420077583,France))
+> // (1433,(28.605445025345137,Europe))
+> // (4293,(28.12516457691193,United_Kingdom))
+> // (1389,(21.962114281302206,English_language))
+> // (1694,(21.77679013455212,Germany))
+> // (4542,(21.328506154058328,World_War_II))
+> // (1385,(20.138550469782487,England))
+> // (2417,(19.88906178678032,Latin))
+> // (2098,(18.246567557461464,India))
+> ~~~
+>
+> 代码说明：[https://livebook.manning.com/book/spark-in-action/chapter-9/133](https://livebook.manning.com/book/spark-in-action/chapter-9/133)
 
-### 9.3.3. Testing the implementation
+### 9.2.4. Connected Components算法
+
+> 查看图有几个互相不连通的子图组成（只要有一条边连接两个顶点，就认为这两个顶点是连通的）
+>
+> ~~~scala
+> val wikiCC = wikigraph.connectedComponents()
+> 
+> wikiCC.vertices.
+> 	map(x => (x._2, x._2)).
+> 	distinct().
+> 	join(articles.map(_.swap)).
+> 	collect.
+> 	foreach(println)
+> // 两个子图：子图中值最小的Vertex ID以及Vertex内容
+> // (0,(0,%C3%81ed%C3%A1n_mac_Gabr%C3%A1in))
+> // (1210,(1210,Directdebit))
+> 
+> wikiCC.
+> 	vertices.
+> 	map(x => (x._2, x._2)).
+> 	countByKey().
+> 	foreach(println)
+> // 每个子图中有多少个顶点
+> // (0,4589)
+> // (1210,3) // 第二个子图只有3个顶点，说明这个图的连通性良好
+> ~~~
+
+### 9.2.5. Strongly Connected Components算法
+
+> 查看图有几个强连通的子图组成（两个顶点必须有双向连接，才认为它们是连通的）
+>
+> ~~~scala
+> val wikiSCC = wikigraph.stronglyConnectedComponents(100)
+> 
+> wikiSCC.vertices.map(x => x._2).distinct.count
+> // 共有519个强连通的子图
+> // res0: Long = 519 
+> 
+> wikiSCC.vertices.map(x => (x._2, x._1)).countByKey().
+>   filter(_._2 > 1).toList.sortWith((x, y) => x._2 > y._2).foreach(println)
+> // (6,4051)
+> // (2488,6)
+> // (1831,3)
+> // (892,2)
+> (1950,2)
+> (4224,2)
+> ...
+> 
+> // 查看这些子图中的顶点
+> wikiSCC.vertices.filter(x => x._2 == 2488).
+> 	join(articles.map(x => (x._2, x._1))).collect.foreach(println)
+> // (2490,(2488,List_of_Asian_countries))
+> // (2496,(2488,List_of_Oceanian_countries))
+> // (2498,(2488,List_of_South_American_countries))
+> // (2493,(2488,List_of_European_countries))
+> // (2488,(2488,List_of_African_countries))
+> // (2495,(2488,List_of_North_American_countries))
+> 
+> wikiSCC.vertices.filter(x => x._2 == 1831).
+> 	join(articles.map(x => (x._2, x._1))).collect.foreach(println)
+> // (1831,(1831,HD_217107))
+> // (1832,(1831,HD_217107_b))
+> // (1833,(1831,HD_217107_c))
+> 
+> wikiSCC.vertices.filter(x => x._2 == 892).
+>   join(articles.map(x => (x._2, x._1))).collect.foreach(println)
+> // (1262,(892,Dunstable_Downs))
+> // (892,(892,Chiltern_Hills))
+> ~~~
+
+## 9.3. 实现A*搜索算法
+
+> todo
+
+9.3.1. Understanding the A* algorithm
+
+> todo
+
+9.3.2. Implementing the A* algorithm
+
+> 略
+
+9.3.3. Testing the implementation
+
+> 略
 
 
