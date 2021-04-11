@@ -25,7 +25,7 @@
     - [9.2.3. Page Rank算法](#923-page-rank%E7%AE%97%E6%B3%95)
     - [9.2.4. Connected Components算法](#924-connected-components%E7%AE%97%E6%B3%95)
     - [9.2.5. Strongly Connected Components算法](#925-strongly-connected-components%E7%AE%97%E6%B3%95)
-  - [9.3. 实现A*搜索算法](#93-%E5%AE%9E%E7%8E%B0a%E6%90%9C%E7%B4%A2%E7%AE%97%E6%B3%95)
+  - [9.3. 实现`A*`搜索算法](#93-%E5%AE%9E%E7%8E%B0a%E6%90%9C%E7%B4%A2%E7%AE%97%E6%B3%95)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -35,7 +35,7 @@
 >
 > 代码：[../ch09/scala/ch09-listings.scala](../ch09/scala/ch09-listings.scala)
 >
-> 内容：介绍Spark GraphX以及图算法API及例子（例如最短路径、Page Rank等），更详细的介绍（例如LDA、SVD算法等）可以参考《[GraphX in Action](https://images.manning.com/165/220/resize/book/8/2ab5574-0640-4779-a5b8-3da48cc92149/Malak-SG-HI.png)》这本书
+> 内容：介绍Spark GraphX以及图算法API及例子（例如最短路径、Page Rank等），更详细的介绍（例如LDA、SVD算法等）可以参考《[GraphX in Action](https://images.manning.com/165/220/resize/book/8/2ab5574-0640-4779-a5b8-3da48cc92149/Malak-SG-HI.jpg)》这本书
 
 ## 9.1. 使用GraphX API
 
@@ -45,7 +45,7 @@
 
 例子如下
 
-> <div align="left"><img src="https://raw.githubusercontent.com/kenfang119/pics/main/upload/spark_graphx_creation_example.png" width="550" /></div>
+> <div align="left"><img src="https://raw.githubusercontent.com/kenfang119/pics/main/500_spark/spark_graphx_creation_example.jpg" width="550" /></div>
 >
 > 顶点（ID、姓名、年龄）；边（关系）；
 >
@@ -562,20 +562,264 @@ Superstep：Pregel 的执行由一组superstep组成，通过Pregel对象的appl
 > // (892,(892,Chiltern_Hills))
 > ~~~
 
-## 9.3. 实现A*搜索算法
+## 9.3. 实现`A*`搜索算法
 
-> todo
+> A*（A Star）是寻路算法，查找图中两个顶点之间的最短路径。在实现该算法时，会将图过滤（graph filtering）、消息聚合（message aggregation）、图Joining（joinning vertices）结合在一起
 
-9.3.1. Understanding the A* algorithm
+9.3.1. 理解`A*`算法
 
-> todo
+> 输入起点、终点 → 找到从起点到达终点的最短路径
+>
+> <div align="left"><img src="https://raw.githubusercontent.com/kenfang119/pics/main/500_spark/spark_graphx_astart_gb1.jpg" width="380" /></div>
+>
+> 地图是一个2维坐标网格，其中包含障碍物（深灰色的坐标点），只能水平或垂直移动
+>
+> 每个坐标被抽象为一个Vertex，可通过水平或垂直移动相连的顶点，被抽象为一条边
 
-9.3.2. Implementing the A* algorithm
+原理
 
-> 略
+> 计算每个顶点相对于起点和终点的成本，然后选择包含这些成本最低的顶点的路径。在上图中
+>
+> * `浅灰色的坐标点`是要为其计算成本的点
+> * `虚线G`是起始顶点和当前顶点（正在考虑的点）之间的路径（即到目前为止已经遍历的路径）
+> * `虚线H`是当前顶点和终点的预估距离
+>
+> 每个顶点的成本使用两种方法来计算，上图中
+>
+> * `虚线G`因为是已经遍历的路径，的长度可以获得，在图中是2（假定每条边的代表的距离都是1）
+> * `虚线H`因为还没有遍历，只能计算预估距离，例如使用从当前顶点到终点的直线距离（也可以使用其他估计函数）
+> * 最终`浅灰色坐标点`的成本`F`的计算公式为：`F = G + H`
+>
+> 距离预估是`A*`算法的核心，要求图中任意两个顶点，都可以估计距离
 
-9.3.3. Testing the implementation
+具体过程：下图演示了一种`A*`算法的计算过程，将标有数字的顶点保存在开放组（白色背景）和封闭组（浅灰色背景）中，标记的数字三元组表示`(到当前顶点的距离，G值，H值)`，而深灰色背景表示障碍
 
-> 略
+> <div align="left"><img src="https://raw.githubusercontent.com/kenfang119/pics/main/500_spark/spark_graphx_astar_demo.jpg" width="500" /></div>
+>
+> 在每轮迭代中，为当前顶点的邻居（不包括已经放入封闭组中的顶点）计算`F, G, H`值并放入`开放组`中（如果已经存在与开放组中、则更新F值为新旧值中的最小值），接下来把开放组中`F值`最低的顶点选做下一个顶点，作为新的当前顶点并放入`封闭组`中。当到达`终点`时、封闭组中的顶点即为最短路径
+
+9.3.2. `A*算法`实现
+
+> ~~~scala
+> object AStar extends Serializable {
+> 	import scala.reflect.ClassTag
+> 	private val checkpointFrequency = 20
+> 
+> 	def run[VD: ClassTag, ED: ClassTag](
+> 		graph:Graph[VD, ED],                  // 要在其上运行A*算法的graph
+> 		origin:VertexId,                      // 起点
+> 		dest:VertexId,                        // 终点
+> 		maxIterations:Int = 100,              // 最大迭代次数（最大走多少步）	
+> 		estimateDistance:(VD, VD) => Double,  // 用来估算两个顶点之间距离的函数
+> 		edgeWeight:(ED) => Double,            // 用来计算Edge权重（可以理解为距离、代价）的函数
+> 
+>         // 如果graph是无向图、下面两个函数可以确定每条边的行走方向、使其成为有向图
+> 		// * 用来计算是否可以访问一条边的Source Vertex的函数
+> 		shouldVisitSource:(ED) => Boolean = (in:ED) => true,
+> 		// * 用来计算是否可以访问一条边的Destination Vertex的函数
+> 		shouldVisitDestination:(ED) => Boolean = (in:ED) => true
+>     ): Array[VD] /*返回A*算出的最短路径*/ = {
+> 		val resbuf = scala.collection.mutable.ArrayBuffer.empty[VD]
+> 
+> 		// 检查原始顶点、目标顶点在图中都存在
+> 		val arr = graph.vertices.flatMap(n => 
+> 			if(n._1 == origin || n._1 == dest) 
+> 				List[Tuple2[VertexId, VD]](n) 
+> 			else 
+> 				List()).collect()
+> 		if(arr.length != 2)
+> 			throw new IllegalArgumentException("Origin or destination not found")
+> 
+> 		// 起点、终点、起点终点之间的预估距离
+> 		val origNode = if (arr(0)._1 == origin) arr(0)._2 else arr(1)._2
+> 		val destNode = if (arr(0)._1 == origin) arr(1)._2 else arr(0)._2
+> 		var dist = estimateDistance(origNode, destNode)
+> 
+> 		// 每个顶点的A*计算数据
+> 		case class WorkNode(
+> 				origNode:VD,                  // 当前计算的节点
+> 				g:Double=Double.MaxValue,     // A*算法的Cost分数G，默认值为Double.MaxValue
+> 				h:Double=Double.MaxValue,     // A*算法的Cost分数H，默认值为Double.MaxValue
+> 				f:Double=Double.MaxValue,     // A*算法的Cost分数F，默认值为Double.MaxValue
+> 				visited:Boolean=false,        // 是否已经被访问，默认值为false
+> 				predec:Option[VertexId]=None  // 走到这个节点所经历，默认值为None
+> 		)
+> 
+> 		// 将graph的vertex类型变为WorkNode
+> 		var gwork = graph.mapVertices{ case(ind, node) => {
+> 			if(ind == origin)
+> 				WorkNode(node, 0, dist, dist)
+> 			else
+> 				WorkNode(node)
+> 			}}.cache()
+> 
+> 		// 从起点的VertexId开始迭代
+> 		var currVertexId:Option[VertexId] = Some(origin /*来自方法参数*/)
+> 		var lastIter = 0
+> 		for(iter <- 0 to maxIterations  // 超过最大迭代次数时停止迭代
+> 			if currVertexId.isDefined;  // 找不到VertexId时停止迭代
+> 			if currVertexId.getOrElse(Long.MaxValue) != dest // 到达终点时停止迭代
+> 		) {
+> 			// 迭代轮数
+> 			lastIter = iter 
+> 			println("Iteration "+iter)
+> 
+> 			// 将当前节点标记为已访问
+> 			gwork.unpersistVertices()
+> 			gwork = gwork.mapVertices((vid:VertexId, v:WorkNode) => {
+> 				if(vid != currVertexId.get)
+> 					v
+> 				else
+> 					WorkNode(v.origNode, v.g, v.h, v.f, true, v.predec) // visited属性改为true
+> 				}).cache()
+> 
+> 			// 定期执行checkpoint操作、来防止DAG太大时堆栈溢出
+> 			if(iter % checkpointFrequency == 0) { 
+> 				gwork.checkpoint() 
+> 			}
+> 
+> 			// 找到临近的点（neighbors，使用subgraph transformation）
+> 			val neighbors = gwork.subgraph(
+> 				trip => trip.srcId == currVertexId.get || trip.dstId == currVertexId.get
+> 			)
+> 
+> 			// 向Neighbors中还没有访问过的顶点发送Message
+> 			// 其中使用了如下3个从外部传入的函数
+> 			// * shouldVisitDestination，shouldVisitSource：决定是否应该访问对应的顶点
+> 			// * edgeWeight：计算A*的Cost G分数
+> 			// 最终返回的是一个仅包含更新了G分数的、邻居节点的图
+> 			val newGs = neighbors.aggregateMessages[Double]
+> 				// 消息发送函数
+> 				ctx => {
+> 					if(ctx.srcId == currVertexId.get 
+> 						&& !ctx.dstAttr.visited && shouldVisitDestination(ctx.attr)) {
+> 						ctx.sendToDst(ctx.srcAttr.g + edgeWeight(ctx.attr))
+> 					}
+> 					else if(ctx.dstId == currVertexId.get 
+> 						&& !ctx.srcAttr.visited && shouldVisitSource(ctx.attr)) {
+> 							 ctx.sendToSrc(ctx.dstAttr.g + edgeWeight(ctx.attr))
+> 				}}, 
+> 				// 消息聚合函数（在这个图的拓扑中，不应当被使用到）
+> 				(a1:Double, a2:Double) => a1, 
+> 				// 哪些字段被放入消息中
+> 				TripletFields.All
+> 			)
+> 
+> 			// 使用outerJoinVertices将原始图、和更新G值的子图进行合并
+> 			val cid = currVertexId.get // 当前节点的ID
+> 			gwork = gwork.outerJoinVertices(
+>                 newGs // 被join的RDD
+>             )(
+> 				// merge function
+>                 (nid /*节点ID*/, node /*原图节点*/, totalG /*被join图的节点属性*/ ) => totalG match {
+> 					// 只在原图中存在的节点
+> 					case None => node
+> 					// 将被Join图的属性值Join进来
+> 					case Some(newG) => {
+> 						if(node.h == Double.MaxValue) {
+> 							// 对于新计算F = G + H值的节点，设置新的Cost Sore F/G/H
+> 							val h = estimateDistance(node.origNode, destNode)
+> 							WorkNode(node.origNode, newG, h, newG+h, false, Some(cid))
+> 						} else if(node.h + newG < node.f) {
+> 							// 对于已经计算过F值的节点，仅在发现更低的F值时才更新
+> 							WorkNode(node.origNode, newG, node.h, newG+node.h, false, Some(cid))
+> 						} else {
+> 							// 其他情况保持节点不变
+> 							node
+> 						}
+>                     }
+> 				}
+> 			)
+> 
+> 			// 在Open Group（参见上面的A*算法说明）的节点中选择下一个要去访问的节点
+> 			// Open Group
+> 			val openList = gwork.vertices.filter(
+> 					v => v._2.h < Double.MaxValue // 已经计算出F值的邻居节点
+> 					&& !v._2.visited 			  // 这个节点还没有被访问过
+> 			)
+> 			if(openList.isEmpty) {
+> 				// open list为空时，没有节点可以继续访问，会导致迭代终止
+> 				currVertexId = None
+>             } else {
+> 				// 选择F = G + H值最小的节点作为下一个要去访问的节点
+> 				val nextV = openList.
+> 					map(v => (v._1 /*节点ID*/, v._2.f /*F值*/)).
+> 					reduce((n1, n2) => if(n1._2 < n2._2) n1 else n2)
+> 				currVertexId = Some(nextV._1)
+> 			}
+> 		}
+> 		
+>         // 处理遍历结果
+> 		if(currVertexId.isDefined && currVertexId.get == dest) {
+> 			// 到达终点：借助predec字段访问路径中前序节点的方式，拼接出路径中的节点列表
+> 			var currId:Option[VertexId] = Some(dest) // 当前节点
+> 			var it = lastIter // 迭代轮数
+> 			while(currId.isDefined && it >= 0) {
+> 				val v = gwork.vertices.filter(x => x._1 == currId.get).collect()(0)
+> 				resbuf += v._2.origNode
+> 				currId = v._2.predec
+> 				it = it - 1
+> 			}
+> 		} else {
+> 			// 没到达终点
+> 			println("Path not found!")
+>         }
+> 
+> 		gwork.unpersist()
+>         // 返回路径
+> 		resbuf.toArray.reverse
+> 	}
+> }
+> ~~~
+
+9.3.3. 测试
+
+> 将上面的A*算法实现，应用在三维坐标系的graph上，这个graph图示如下
+>
+> <div align="left"><img src="https://raw.githubusercontent.com/kenfang119/pics/main/500_spark/spark_graphx_astar_running_example.jpg" width="350" /></div>
+>
+> 代码
+>
+> ~~~scala
+> // 三维空间中的点
+> case class Point(x:Double, y:Double, z:Double)
+> 
+> // 构造graph，这个graph如上面的图片所示
+> val vertices3d = sc.parallelize(Array(
+> 	(1L, Point(1,2,4 )), (2L,  Point(6,4,4)),   (3L, Point(8,5,1)), (4L, Point(2,2,2)),
+> 	(5L, Point(2,5,8 )), (6L,  Point(3,7,4)),   (7L, Point(7,9,1)), (8L, Point(7,1,2)), 
+> 	(9L, Point(8,8,10)), (10L, Point(10,10,2)), (11L, Point(8,4,3))))
+> val edges3d = sc.parallelize(Array(
+> 	Edge(1, 2, 1.0), Edge(2, 3 , 1.0), Edge(3,  4 , 1.0), Edge(4, 1 , 1.0), 
+> 	Edge(1, 5, 1.0), Edge(4, 5 , 1.0), Edge(2,  8 , 1.0), Edge(4, 6 , 1.0), 
+> 	Edge(5, 6, 1.0), Edge(6, 7 , 1.0), Edge(7,  2 , 1.0), Edge(2, 9 , 1.0),
+>     Edge(7, 9, 1.0), Edge(7, 10, 1.0), Edge(10, 11, 1.0), Edge(9, 11, 1.0)))
+> val graph3d = Graph(vertices3d, edges3d)
+> 
+> // 预估两个顶点之间距离的函数
+> val calcDistance3d = (p1:Point, p2:Point) => {
+>     val x = p1.x - p2.x
+>     val y = p1.y - p2.y
+>     val z = p1.z - p2.z
+>     Math.sqrt(x*x + y*y + z*z)
+> }
+> 
+> // 计算向连顶点之间的实际距离
+> val graph3dDst = graph3d.mapTriplets(t => calcDistance3d(t.srcAttr, t.dstAttr))
+> 
+> // 设置checkpoint存储路径
+> sc.setCheckpointDir("/tmp/sparkCheckpoint")
+> 
+> // 计算最短路径
+> AStar.run(graph3dDst, 1, 10, 50, calcDistance3d, (e:Double) => e)
+> ~~~
+>
+> 输出结果
+>
+> ~~~scala
+> scala> AStar.run(graph3dDst, 1, 10, 50, calcDistance3d, (e:Double) => e)
+> res0: Array[Point] = Array(Point(1.0,2.0,4.0), Point(6.0,4.0,4.0),
+> Point(7.0,9.0,1.0), Point(10.0,10.0,2.0))
+> ~~~
 
 
