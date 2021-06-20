@@ -210,9 +210,13 @@ PairDStreamFunctions对象提供了例如`combineByKey`、`reduceByKey`、`flatM
 
 ### 6.1.7. 随着时间推移保存计算状态
 
-> 之前小节的例子，只需要当前mini-batch的数据
+> 之前小节的例子，只需要当前mini-batch的数据。这一小节演示如下一种应用：(1) 根据每个mini-batch更新state；(2) 根据`<state, current_mini_batch>`生成新的输出
+>
+> <div align="left"><img src="https://raw.githubusercontent.com/kenfang119/pics/main/500_spark/spark_streaming_with_state.jpg" width="500" /></div>
 
-#### Keeping track of the state using updateStateByKey
+#### (1) 使用`updateStateByKey`来跟踪状态变化
+
+> 
 
 #### Combining two DStreams using union
 
